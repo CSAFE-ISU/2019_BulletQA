@@ -19,6 +19,10 @@ You will annotate the scanned bullets, use `x3ptools` to view the annotated bull
 
 ## Background Reading and Preparation Activities
 
+### Github
+
+This summer, you'll be using GitHub to keep track of code and other work you perform. Please create a github account if you haven't already, and send your username to Susan so you can be added to the CSAFE group. [Happy Git and GitHub for the useR](https://happygitwithr.com/) is a good online book that discusses how Git and R can be used together. The `usethis` package in R makes using git and github in R projects relatively stress-free. 
+
 ### R setup
 
 Please make sure you have R version 3.5.0 or above, and run `update.packages(ask = FALSE, checkBuilt = TRUE)` to ensure your packages are updated to the newest version.
