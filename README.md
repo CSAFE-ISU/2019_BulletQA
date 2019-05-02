@@ -59,7 +59,11 @@ described in the installation instructions.
     Impressions. ArXiv:1601.05788
     \[Stat\].](http://arxiv.org/abs/1601.05788)
 
-  - Case Study Validation paper (draft)
+  - Breiman, L. (2001). Random Forests. Machine Learning, 45(1), 5–32.
+    <https://doi.org/10.1023/A:1010933404324>
+
+  - Case Study Validation paper
+    ([draft](inst/Other/case-validation-draft.pdf))
 
   - Biasotti, A. (1959). A statistical study of the individual
     characteristics of fired bullets. Journal of Forensic Sciences, 4,
