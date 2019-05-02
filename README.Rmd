@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 
 This project will involve the creation of a curated data set with bullets that have been annotated, with the goal of ensuring that the data used to fit a random forest for bullet matching is of the highest possible quality.
 
-You will annotate the scanned bullets, use `x3ptools` to view the annotated bullets, and use `bulletxtrctr` to ensure that the features derived from the bullet scan are optimal. 
+You will annotate the scanned bullets, use `x3ptools` to view the annotated bullets, and use `bulletxtrctr` to ensure that the features derived from the bullet scan are optimal. At the end of the summer, we will hopefully have enough good data to re-fit the random forest using the new features. 
 
 ## Background Reading and Preparation Activities
 
@@ -40,11 +40,26 @@ devtools::install_github("heike/bulletxtrctr")
 
 CSAFE has developed a chrome extension for annotating x3p files, called [fix3p](https://chrome.google.com/webstore/detail/fix3p/). Please install the extension, and enable file support and debugging as described in the installation instructions.
 
-### Forensic Firearm and Toolmark Examination
+### Background reading: Forensic Firearm and Toolmark Examination
 
-- Original bullet RF paper
-- case study validation paper
-- ??
+- Original bullet random forest paper: [Hare, E., Hofmann, H., & Carriquiry, A. (2016). Automatic Matching of Bullet Land Impressions. ArXiv:1601.05788 [Stat].](http://arxiv.org/abs/1601.05788) 
+
+- Case Study Validation paper (draft)
+
+- Biasotti, A. (1959). A statistical study of the individual characteristics of fired bullets. Journal of Forensic Sciences, 4, 34. (PDF Available on Zotero)
+
+- [Firearm Examiner Training](https://projects.nfstc.org/firearms/module09/fir_m09_t04.htm):    
+Useful Modules:
+    - [Identification](https://projects.nfstc.org/firearms/module09/fir_m09_t04.htm)
+    - [Identification Process ](https://projects.nfstc.org/firearms/module09/fir_m09_t05.htm)   
+Historical Background: [AFTE Range of Conclusions](https://projects.nfstc.org/firearms/module09/fir_m09_t06.htm) (This is how examiners currently operate, and what we're trying to replace)
+
+- General Forensics and Statistics: [President's Council of Advisors on Science and Technology Report on Forensic Science in Criminal Courts](https://obamawhitehouse.archives.gov/sites/default/files/microsites/ostp/PCAST/pcast_forensic_science_report_final.pdf)    
+This report is long and you definitely don't have to read it, but it might be interesting in understanding the wider issues CSAFE is trying to address
+
+-----------------------------------------
+
+This section still very much under construction...
 
 ## Getting Started
 
