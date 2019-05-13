@@ -91,23 +91,36 @@ described in the installation instructions.
 
 -----
 
-This section still very much under construction…
+This section still very much under
+construction…
 
 ## Getting Started
 
-## Step 1: Annotations
+## Step 1: Refit randomForest model with original data using `bulletxtrctr`
 
-We will use the following bullet scan data sets for fitting the random
-forest:
+Use Hamby 173 and 252 obtained from NIST to calculate features with
+`bulletxtrctr`. Use these features to fit the random forest.
 
-  - Hamby 36
-  - Hamby 44
-  - Houston FSI
-  - Phoenix PD
-  - ??
+Files are stored on isu-csafe in /media/Raven/REU\_Refit/ but were
+downloaded from NIST NRBTD. I highly recommend running this on the
+server rather than your personal laptop.
+
+  - [bulletxtrctr package
+    documentation](https://heike.github.io/bulletxtrctr/)
+
+  - Original bullet random forest paper: [Hare, E., Hofmann, H., &
+    Carriquiry, A. (2016). Automatic Matching of Bullet Land
+    Impressions. ArXiv:1601.05788
+    \[Stat\].](http://arxiv.org/abs/1601.05788)
+
+## Step 2: Annotations
+
+One goal for this summer is to make the random forest robust to
+different firearm types, ammunition, scan resolutions, etc.
+
+To do this, we need to curate a large amount of scans, ensuring that
+scans of high quality are used to fit the random forest.
 
 In order to annotate the scans, you will load the x3p file into fix3p in
 chrome, using the annotation tool to mark the following: - left groove -
 right groove - breakoff - pitting - well-expressed striae
-
-Examples of these issues are shown below:
