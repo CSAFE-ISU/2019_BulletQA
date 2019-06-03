@@ -1,0 +1,380 @@
+---
+title: "Untitled"
+author: "Andrew Maloney"
+date: "5/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Loading Packages
+#Will most likely add more
+library(dplyr)
+library(bulletxtrctr)
+library(x3ptools)
+library(randomForest)
+library(ggplot2)
+library(readr)
+library(furrr)
+library(stringr)
+library(dichromat)
+library(future)
+library(gridExtra)
+library(tidyr)
+
+options(future.globals.maxSize = 2097152000)
+```
+
+```{r}
+# Reading in Hamby_173
+df <- tibble(path = list.files(path = "Hamby_173", pattern = ".x3p", recursive = T, full.names = T)) %>% mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% str_remove("Barrel"), Bullet = str_extract(path, "Bullet[12A-Z]") %>% str_remove("Bullet"),Land = str_extract(path, "land\\d{1}") %>% str_remove("land")) %>% mutate(x3p = future_map(path, read_x3p)) 
+
+# Reading in Hamby_252
+df2 <- tibble(path = list.files(path = "Hamby_252", pattern = ".x3p", recursive = T, full.names = T)) %>% mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% str_remove("Barrel"), Bullet = str_extract(path, "Bullet[12A-Z]") %>% str_remove("Bullet"), Land = str_extract(path, "Bullet [12A-Z]-[123456]") %>% str_remove("Bullet [12A-Z]-")) %>% mutate(x3p = future_map(path,read_x3p)) 
+
+```
+
+```{r}
+df <- df %>% mutate(x3p = x3p %>% future_map(.f = function(x) x %>% x3p_m_to_mum() %>% rotate_x3p(angle = -180) %>% y_flip_x3p()))
+
+df2 <- df2 %>% mutate(x3p = x3p %>% future_map(.f = function(x) x %>% x3p_m_to_mum() %>% rotate_x3p(angle= -90) %>% y_flip_x3p()))
+
+```
+
+```{r}
+df <- df %>% mutate(CrossSection = x3p %>% future_map_dbl(.f = x3p_crosscut_optimize, minccf = 0.9, span = 0.03, percent_missing = 25)) # Obtaining Cross Section for Hamby_173
+df2 <- df2 %>% mutate(CrossSection = x3p %>% future_map_dbl(.f = x3p_crosscut_optimize, minccf = 0.9, span = 0.03, percent_missing = 25)) # Obtaing Cross Section for hamby_173
+
+head(df, 5)
+#head(df2, 25)
+
+```
+
+```{r}
+#Cross Sections
+df <- df %>% mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))  #Obtaining Cross Cuts
+df2 <- df2 %>% mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut)) #Obtaining Cross Cuts 
+
+Cross_Data_173 <- df %>% tidyr::unnest(CrossCut)
+Cross_Data_252 <- df %>% tidyr::unnest(CrossCut)
+
+head(df, 5)
+head(Cross_Data_173, 5)
+#head(Cross_Data_252, 1000)
+
+```
+
+```{r}
+#Grooves
+df <- df %>% mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = F)) #Obtaining Grooves Hamby_173
+
+df2 <- df2 %>% mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = F)) #Obtaining Grooves Hamby_252
+
+Grooves_173 <- df %>% tidyr::unnest(Grooves)
+Grooves_252 <- df2 %>% tidyr::unnest(Grooves)
+
+head(df, 500)
+head(Grooves_173, 5)
+#head(Grooves_252, 1000)
+
+```
+
+```{r}
+#Signatures
+df <- df %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_173
+
+df2 <- df2 %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_252
+
+Signatures_173 <- df %>% select(path, Signatures) %>% tidyr::unnest() %>% filter(is.na(sig), is.na(raw_sig))
+Signatures_252 <- df2 %>% select(path, Signatures) %>% tidyr::unnest() %>% filter(is.na(sig), is.na(raw_sig))
+
+head(df, 5)
+head(Signatures_173, 5)
+#head(Grooves_252, 1000)
+
+```
+
+```{r}
+
+dfx <- df %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land) 
+
+df2x<- df2 %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land)
+
+Comparison_173 <- dfx %>%
+  crossing(Land1 = unique(.$Bullet_Land)) %>% 
+      left_join(set_names(dfx, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
+
+Comparison_252 <- df2x %>% 
+  crossing(Land1 = unique(.$Bullet_Land)) %>% 
+    left_join(set_names(df2x, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
+
+dfx <- dfx %>% tidyr::unnest()
+df2x <- df2x %>% tidyr::unnest()
+
+
+head(Comparison_173)
+Comparison_173 <- Comparison_173 %>% select(Land1, Land2)
+Comparison_252 <- Comparison_252 %>% select(Land1, Land2)
+```
+
+```{r}
+Compare_173x <- Comparison_173 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
+    Land1 <- dfx$Signatures[dfx$Bullet_Land == xx][[1]]
+    Land2 <- dfx$Signatures[dfx$Bullet_Land == yy][[1]]
+    Land1$Bullet <- "First-Land"
+    Land2$Bullet <- "Second-Land"
+    
+    sig_align(Land1$sig, Land2$sig)
+  })
+)
+
+
+Compare_252x <- Comparison_252 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
+    Land1 <- df2x$Signatures[df2x$Bullet_Land == xx][[1]]
+    Land2 <- df2x$Signatures[df2x$Bullet_Land == yy][[1]]
+    Land1$Bullet <- "First-Land"
+    Land2$Bullet <- "Second-Land"
+    
+    sig_align(Land1$sig, Land2$sig)
+  })
+)
+
+
+head(Compare_252x, 10)
+
+```
+
+
+```{r}
+Compare_173x <- Compare_173x %>% mutate(ccf0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_ccf(x$lands)))
+Compare_173x <- Compare_173x %>% mutate(lag0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_lag(x$lands)))
+Compare_173x <- Compare_173x %>% mutate(D0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_D(x$lands)))
+Compare_173x <- Compare_173x %>% mutate(length0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_length(x$lands)))
+Compare_173x <- Compare_173x %>% mutate(overlap0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_overlap(x$lands)))
+
+Compare_173x <- Compare_173x %>% mutate(striae = Aligned %>% future_map(.f = sig_cms_max, span = 35))
+
+Compare_173x <- Compare_173x %>% mutate(cms_per_m = future_map2(striae, Aligned, .f = function(x, y){
+  extract_feature_cms_per_mm(x$lines, y$lands, resolution = 1.5625)
+}), matches0 = striae %>% map_dbl(.f = function(x){
+  bulletxtrctr:::extract_helper_feature_n_striae(x$lines, type = "peak", match = TRUE)
+}), mismatches0 = striae %>% map_dbl(.f = function(x){
+  bulletxtrctr:::extract_helper_feature_n_striae(x$lines, type = "peak", match = FALSE)
+}))
+
+
+
+
+Compare_252x <- Compare_252x %>% mutate(ccf0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_ccf(x$lands)))
+Compare_252x <- Compare_252x %>% mutate(lag0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_lag(x$lands)))
+Compare_252x <- Compare_252x %>% mutate(D0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_D(x$lands)))
+Compare_252x <- Compare_252x %>% mutate(length0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_length(x$lands)))
+Compare_252x <- Compare_252x %>% mutate(overlap0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_overlap(x$lands))) 
+
+Compare_252x <- Compare_252x %>% mutate(striae = Aligned %>% future_map(.f = sig_cms_max, span = 35))
+
+Compare_252x <- Compare_252x %>% mutate(cms_per_m = future_map2(striae, Aligned, .f = function(x, y){
+  extract_feature_cms_per_mm(x$lines, y$lands, resolution = 1.5625)
+}), matches0 = striae %>% future_map_dbl(.f = function(x){
+  bulletxtrctr:::extract_helper_feature_n_striae(x$lines, type = "peak", match = TRUE)
+}), mismatches0 = striae %>% future_map_dbl(.f = function(x){
+  bulletxtrctr:::extract_helper_feature_n_striae(x$lines, type = "peak", match = FALSE)
+}))
+```
+
+```{r}
+# Splitting "String" into seperate Columns for Hamby_173
+Compare_173x <- Compare_173x %>% mutate(BarrelA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Land1))
+Compare_173x <- Compare_173x %>% mutate(BarrelB = gsub("([0-9]{0,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Land2))
+Compare_173x <- Compare_173x %>% mutate(BulletA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Land1))
+Compare_173x <- Compare_173x %>% mutate(BulletB = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Land2))
+Compare_173x <- Compare_173x %>% mutate(LandA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Land1))
+Compare_173x <- Compare_173x %>% mutate(LandB = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Land2))
+
+
+ 
+Compare_252x <- Compare_252x %>% mutate(BarrelA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Land1))
+Compare_252x <- Compare_252x %>% mutate(BarrelB = gsub("([0-9]{0,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Land2))
+Compare_252x <- Compare_252x %>% mutate(BulletA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Land1))
+Compare_252x <- Compare_252x %>% mutate(BulletB = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Land2))
+Compare_252x <- Compare_252x %>% mutate(LandA = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Land1))
+Compare_252x <- Compare_252x %>% mutate(LandB = gsub("([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Land2))
+
+
+head(Compare_252x, 40)
+
+
+```
+
+
+```{r}
+Compare_173x <- Compare_173x %>% mutate(Features = future_map2(.x = Aligned, .y = striae, .f = extract_features_all, resolution = 1.5625))
+Compare_173x <- Compare_173x %>% mutate(Legacy_Features = future_map(striae, extract_features_all_legacy, resolution = 1.5625))
+Compare_173x <- Compare_173x %>% tidyr::unnest(Legacy_Features)
+
+Compare_252x <- Compare_252x %>% mutate(Features = future_map2(.x = Aligned, .y = striae, .f = extract_features_all, resolution = 1.5625))
+Compare_252x <- Compare_252x %>% mutate(Legacy_Features = future_map(striae, extract_features_all_legacy, resolution = 1.5625))
+Compare_252x <- Compare_252x %>% tidyr::unnest(Legacy_Features)
+
+```
+
+```{r}
+Compare_173x$rfscore <- predict(rtrees, newdata = Compare_173x, type = "prob")[,2]
+Compare_252x$rfscore <- predict(rtrees, newdata = Compare_252x, type = "prob")[,2]
+
+
+```
+
+```{r}
+Bullet_Scores_173x <- Compare_173x %>% group_by(BulletA, BulletB) %>% tidyr::nest()
+Bullet_Scores_173x <- Bullet_Scores_173x %>% mutate(Bullet_Score = data %>% future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+Bullet_Scores_173x %>% select(-data)
+
+Bullet_Scores_252x <- Compare_252x %>% group_by(BulletA, BulletB) %>% tidyr::nest()
+Bullet_Scores_252x <- Bullet_Scores_252x %>% mutate(Bullet_Score = data %>% future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+Bullet_Scores_252x %>% select(-data)
+
+```
+
+```{r}
+Bullet_Scores_173x <- Bullet_Scores_173x %>% mutate(data = data %>% future_map(.f = function(d){
+  d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores_173x %>% tidyr::unnest(data)
+head(Bullet_Scores_173x, 100)
+
+
+Bullet_Scores_252x <- Bullet_Scores_252x %>% mutate(data = data %>% future_map(.f = function(d){
+  d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores_252x
+
+```
+
+```{r}
+#Feature Density Plots for Hamby_173
+
+
+Compare_173x <- Compare_173x %>% 
+  mutate(KM_KNM = if_else(ccf >= 0.50, "Known_Match", "Known_Non_Match")) %>%
+      mutate(KM_KNM = factor(KM_KNM)) 
+
+Compare_173x %>% ggplot(aes(cms, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + scale_x_continuous(limits = c(0, 3.5)) +
+      ggtitle("Cms Density Plot")
+
+Compare_173x %>% ggplot(aes(non_cms, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("Non_cms Density Plot")
+
+Compare_173x %>% ggplot(aes(matches, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("#Matches Density Plot")
+
+Compare_173x %>% ggplot(aes(mismatches, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("#MisMatches Density Plot")
+
+Compare_173x %>% ggplot(aes(D, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + 
+      ggtitle("Average Distance Density Plot")
+
+Compare_173x %>% ggplot(aes(sum_peaks, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + scale_x_continuous(limits = c(0, 20)) +
+      ggtitle("Sum of Peaks Density Plot")
+
+Compare_173x %>% ggplot(aes(ccf, fill = KM_KNM)) + 
+  geom_density(position = "identity", alpha = 0.50) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("Ccf Density Plot")
+
+head(Compare_173x, 25)
+
+
+```
+
+```{r}
+#Feature Density Plots for Hamby_252
+
+Compare_252x <- Compare_252x %>% mutate(KM_KNM = if_else(ccf >= 0.50, "Known_Match", "Known_non_Match")) %>% 
+  mutate(KM_KNM = factor(KM_KNM))
+
+Compare_252x %>% ggplot(aes(cms, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + scale_x_continuous(limits = c(0, 3.5)) +
+      ggtitle("Cms Density Plot")
+
+Compare_252x %>% ggplot(aes(non_cms, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("Non_cms Density Plot")
+
+Compare_252x %>% ggplot(aes(matches, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("#Matches Density Plot")
+
+Compare_252x %>% ggplot(aes(mismatches, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("#MisMatches Density Plot")
+
+Compare_252x %>% ggplot(aes(D, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + 
+      ggtitle("Average Distance Density Plot")
+
+Compare_252x %>% ggplot(aes(sum_peaks, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.55) + 
+    scale_fill_brewer(palette = "Paired") + scale_x_continuous(limits = c(0, 20)) +
+      ggtitle("Sum of Peaks Density Plot")
+
+Compare_252x %>% ggplot(aes(ccf, fill = KM_KNM)) + 
+  geom_density(position = "identity", alpha = 0.50) + 
+    scale_fill_brewer(palette = "Paired") +
+      ggtitle("Ccf Density Plot")
+
+
+```
+
+```{r}
+#Combined plots using facet_wrap for hamby_173
+HambyDataLong <- gather(Compare_173x, key="measure", value="value", c("ccf", "cms", "non_cms", "matches", "mismatches", "D", "sum_peaks"))
+
+HambyDataLong %>% ggplot(aes(value, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.50)+
+    facet_wrap(~measure, ncol = 4, scales = "free")+
+      scale_fill_brewer(palette = "Paired") + theme_bw()+
+        ggtitle("Marginal Density for Features")
+    
+```
+
+```{r}
+#Combined plots using facet_wrap for hamby_252
+HambyDataLong_2 <- gather(Compare_252x, key="measure", value="value", c("ccf", "cms", "non_cms", "matches", "mismatches", "D", "sum_peaks"))
+
+HambyDataLong_2 %>% ggplot(aes(value, fill = KM_KNM))+
+  geom_density(position = "identity", alpha = 0.50)+
+    facet_wrap(~measure, ncol = 4, scales = "free")+
+      scale_fill_brewer(palette = "Paired") + theme_bw()+
+        ggtitle("Marginal Density for Features")
+
+```
+
+
+
+
+
