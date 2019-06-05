@@ -25,45 +25,69 @@ library(future)
 library(gridExtra)
 library(tidyr)
 
-options(future.globals.maxSize = 2097152000)
+options(future.globals.maxSize = 4*1024*1024*1024)
+
+data_dir <- "/media/Raven/REU_Refit"
 ```
 
 ```{r}
 # Reading in Hamby_173
-df <- tibble(path = list.files(path = "Hamby_173", pattern = ".x3p", recursive = T, full.names = T)) %>% mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% str_remove("Barrel"), Bullet = str_extract(path, "Bullet[12A-Z]") %>% str_remove("Bullet"),Land = str_extract(path, "land\\d{1}") %>% str_remove("land")) %>% mutate(x3p = future_map(path, read_x3p)) 
+df <- tibble(path = list.files(path = file.path(data_dir, "Hamby_173"), 
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% 
+  mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% 
+           str_remove("Barrel"), 
+         Bullet = str_extract(path, "Bullet[12A-Z]") %>% 
+           str_remove("Bullet"),
+         Land = str_extract(path, "land\\d{1}") %>% 
+           str_remove("land")) %>% 
+  mutate(Set = "Hamby173") %>%
+  mutate(x3p = future_map(path, read_x3p)) %>%
+  # Adjust orientation
+# I rewrote this so it's a bit clearer. The ~ notation in purrr is pretty concise - no need to define new functions inline.
+  mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
 
 # Reading in Hamby_252
-df2 <- tibble(path = list.files(path = "Hamby_252", pattern = ".x3p", recursive = T, full.names = T)) %>% mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% str_remove("Barrel"), Bullet = str_extract(path, "Bullet[12A-Z]") %>% str_remove("Bullet"), Land = str_extract(path, "Bullet [12A-Z]-[123456]") %>% str_remove("Bullet [12A-Z]-")) %>% mutate(x3p = future_map(path,read_x3p)) 
+df2 <- tibble(path = list.files(path = file.path(data_dir, "Hamby_252"), 
+                                pattern = ".x3p", recursive = T, 
+                                full.names = T)) %>% 
+  mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% 
+           str_remove("Barrel"), 
+         Bullet = str_extract(path, "Bullet[12A-Z]") %>% 
+           str_remove("Bullet"), 
+         Land = str_extract(path, "Bullet [12A-Z]-[123456]") %>% 
+           str_remove("Bullet [12A-Z]-")) %>% 
+  mutate(Set = "Hamby252") %>%
+  mutate(x3p = future_map(path,read_x3p))  %>%
+  # Adjust orientation
+  mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
 
+# One big data set - easier to debug the code if you do everything in one big go.
+hamby <- bind_rows(df, df2)
+rm(df, df2)
 ```
 
 ```{r}
-df <- df %>% mutate(x3p = x3p %>% future_map(.f = function(x) x %>% x3p_m_to_mum() %>% rotate_x3p(angle = -180) %>% y_flip_x3p()))
+hamby <- hamby %>%
+  mutate(
+    CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25)
+  )
 
-df2 <- df2 %>% mutate(x3p = x3p %>% future_map(.f = function(x) x %>% x3p_m_to_mum() %>% rotate_x3p(angle= -90) %>% y_flip_x3p()))
+# Susan comment: Cross sections of 400, 550, 1000, are generally too high to be useful. You need to do some exploratory diagnostics here.
 
-```
-
-```{r}
-df <- df %>% mutate(CrossSection = x3p %>% future_map_dbl(.f = x3p_crosscut_optimize, minccf = 0.9, span = 0.03, percent_missing = 25)) # Obtaining Cross Section for Hamby_173
-df2 <- df2 %>% mutate(CrossSection = x3p %>% future_map_dbl(.f = x3p_crosscut_optimize, minccf = 0.9, span = 0.03, percent_missing = 25)) # Obtaing Cross Section for hamby_173
-
-head(df, 5)
+x3p_image(hamby$x3p[[232]], crosscut = 1600)
+head(select(hamby, -path, -x3p), 5)
 #head(df2, 25)
 
 ```
 
 ```{r}
 #Cross Sections
-df <- df %>% mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))  #Obtaining Cross Cuts
-df2 <- df2 %>% mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut)) #Obtaining Cross Cuts 
+hamby <- hamby %>% 
+  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
 
-Cross_Data_173 <- df %>% tidyr::unnest(CrossCut)
-Cross_Data_252 <- df %>% tidyr::unnest(CrossCut)
-
-head(df, 5)
-head(Cross_Data_173, 5)
-#head(Cross_Data_252, 1000)
+crosscuts <- hamby %>% 
+  tidyr::unnest(CrossCut)
 
 ```
 
