@@ -63,7 +63,12 @@ df2 <- tibble(path = list.files(path = file.path(data_dir, "Hamby_252"),
   mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
 
 # One big data set - easier to debug the code if you do everything in one big go.
-hamby <- bind_rows(df, df2)
+hamby <- bind_rows(df, df2) 
+
+hamby <- hamby %>%
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Set, Barrel, Bullet, Land, x3p, path)
+
 rm(df, df2)
 ```
 
@@ -74,6 +79,7 @@ hamby <- hamby %>%
   mutate(
     CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25)
   )
+
 head(select(hamby, -path, -x3p), 5)
 #head(df2, 25)
 
@@ -84,30 +90,35 @@ head(select(hamby, -path, -x3p), 5)
 hamby <- hamby %>% 
   mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
 
-crosscuts <- hamby %>% 
+crosscuts <- select(hamby, -path, -x3p) %>% 
   tidyr::unnest(CrossCut)
 
 ```
 
 ```{r}
 #Grooves
-hamby <- hamby %>% 
-  mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = T)) 
+saved_grooves_location <- "H173_H252_Grooves_data.rda"
+if (file.exists(saved_grooves_location)) {
+  hamby$Grooves <- readRDS(saved_grooves_location)
+} else {
+  hamby <- hamby %>% 
+    mutate(Grooves = CrossCut %>% 
+             future_map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
 
 grooves <- hamby %>% tidyr::unnest(Grooves)
 head(grooves, 10)
 head(select(hamby, -path, -x3p, -CrossCut), 5)
 
 # Need to check the grooves and set manually for now...
+
+plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 ```
 # When run in interactive mode, a shiny app can be used to set smarter grooves.
 ```{r get-grooves-interactive, echo = FALSE}
 library(shiny)
 
-hamby <- hamby %>%
-  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-"))
-
-saved_grooves_location <- "H173_H252_Grooves_data.rda"
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
 }
@@ -189,7 +200,7 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 
 ```{r}
 #Signatures
-hamby <- hamby %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_173
+hamby <- hamby %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
 
 Signatures <- hamby %>% select(id, Set, Barrel, Bullet, Land, Signatures) %>% tidyr::unnest()
 head(Signatures, 5)
@@ -205,59 +216,89 @@ ggplot(data = ., aes(x = x, y = sig, color = Land)) +
 ```
 
 ```{r}
-
 comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
-  left_join(nest(hamby, -id) %>% set_names(c("Bullet1")))
-dfx <- df %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land) 
+  left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
+  mutate(Set1 = str_extract(Bullet1, "Hamby\\d{2,3}"),
+         Set2 = str_extract(Bullet2, "Hamby\\d{2,3}")) %>%
+  filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
+  select(-matches("Set"))
 
-df2x<- df2 %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land)
+head(comparisons)
 
-Comparison_173 <- dfx %>%
-  crossing(Land1 = unique(.$Bullet_Land)) %>% 
-      left_join(set_names(dfx, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
-
-Comparison_252 <- df2x %>% 
-  crossing(Land1 = unique(.$Bullet_Land)) %>% 
-    left_join(set_names(df2x, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
-
-dfx <- dfx %>% tidyr::unnest()
-df2x <- df2x %>% tidyr::unnest()
-
-
-head(Comparison_173)
-Comparison_173 <- Comparison_173 %>% select(Land1, Land2)
-Comparison_252 <- Comparison_252 %>% select(Land1, Land2)
+# dfx <- df %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land) 
+# 
+# df2x<- df2 %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land)
+# 
+# Comparison_173 <- dfx %>%
+#   crossing(Land1 = unique(.$Bullet_Land)) %>% 
+#       left_join(set_names(dfx, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
+# 
+# Comparison_252 <- df2x %>% 
+#   crossing(Land1 = unique(.$Bullet_Land)) %>% 
+#     left_join(set_names(df2x, c("Land1", "data2"))) %>% rename(Land2 = Bullet_Land) %>% mutate(Land1 = factor(Land1), Land2 = factor(Land2))
+# 
+# dfx <- dfx %>% tidyr::unnest()
+# df2x <- df2x %>% tidyr::unnest()
+# 
+# 
+# head(Comparison_173)
+# Comparison_173 <- Comparison_173 %>% select(Land1, Land2)
+# Comparison_252 <- Comparison_252 %>% select(Land1, Land2)
 ```
 
 ```{r}
-Compare_173x <- Comparison_173 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
-    Land1 <- dfx$Signatures[dfx$Bullet_Land == xx][[1]]
-    Land2 <- dfx$Signatures[dfx$Bullet_Land == yy][[1]]
-    Land1$Bullet <- "First-Land"
-    Land2$Bullet <- "Second-Land"
-    
-    sig_align(Land1$sig, Land2$sig)
-  })
-)
+get_sig <- function(data) {
+  purrr::map(data$Signatures, "sig")
+}
 
+comparisons <- comparisons %>%
+  mutate(sig1 = purrr::map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
 
-Compare_252x <- Comparison_252 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
-    Land1 <- df2x$Signatures[df2x$Bullet_Land == xx][[1]]
-    Land2 <- df2x$Signatures[df2x$Bullet_Land == yy][[1]]
-    Land1$Bullet <- "First-Land"
-    Land2$Bullet <- "Second-Land"
-    
-    sig_align(Land1$sig, Land2$sig)
-  })
-)
+plan(multicore)
+comparisons <- comparisons %>%
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y))))
 
+# Get striae
+comparisons <- comparisons %>%
+  mutate(Striae = future_map(Aligned, sig_cms_max))
 
-head(Compare_252x, 10)
+saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
+
+# Compare_173x <- Comparison_173 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
+#     Land1 <- dfx$Signatures[dfx$Bullet_Land == xx][[1]]
+#     Land2 <- dfx$Signatures[dfx$Bullet_Land == yy][[1]]
+#     Land1$Bullet <- "First-Land"
+#     Land2$Bullet <- "Second-Land"
+#     
+#     sig_align(Land1$sig, Land2$sig)
+#   })
+# )
+# 
+# 
+# Compare_252x <- Comparison_252 %>% mutate(Aligned = future_map2(.x = Land1, .y = Land2, .f = function(xx, yy) {
+#     Land1 <- df2x$Signatures[df2x$Bullet_Land == xx][[1]]
+#     Land2 <- df2x$Signatures[df2x$Bullet_Land == yy][[1]]
+#     Land1$Bullet <- "First-Land"
+#     Land2$Bullet <- "Second-Land"
+#     
+#     sig_align(Land1$sig, Land2$sig)
+#   })
+# )
+# 
+# 
+# head(Compare_252x, 10)
 
 ```
 
 
 ```{r}
+comparisons <- comparisons %>% 
+  mutate(features = future_map2(Aligned, Striae, extract_features_all, resolution = 1.5625),
+         features_legacy = future_map2(Aligned, Striae, extract_features_all_legacy, ))
+         
+extract_features_all()
+
 Compare_173x <- Compare_173x %>% mutate(ccf0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_ccf(x$lands)))
 Compare_173x <- Compare_173x %>% mutate(lag0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_lag(x$lands)))
 Compare_173x <- Compare_173x %>% mutate(D0 = Aligned %>% future_map_dbl(.f = function(x) extract_feature_D(x$lands)))
