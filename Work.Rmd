@@ -68,14 +68,12 @@ rm(df, df2)
 ```
 
 ```{r}
+plan(multicore) # use all the cores at once
+
 hamby <- hamby %>%
   mutate(
     CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25)
   )
-
-# Susan comment: Cross sections of 400, 550, 1000, are generally too high to be useful. You need to do some exploratory diagnostics here.
-
-x3p_image(hamby$x3p[[232]], crosscut = 1600)
 head(select(hamby, -path, -x3p), 5)
 #head(df2, 25)
 
@@ -93,36 +91,123 @@ crosscuts <- hamby %>%
 
 ```{r}
 #Grooves
-df <- df %>% mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = F)) #Obtaining Grooves Hamby_173
+hamby <- hamby %>% 
+  mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = T)) 
 
-df2 <- df2 %>% mutate(Grooves = CrossCut %>% future_map(.f = cc_locate_grooves, method = "rollapply", smoothfactor = 15, return_plot = F)) #Obtaining Grooves Hamby_252
+grooves <- hamby %>% tidyr::unnest(Grooves)
+head(grooves, 10)
+head(select(hamby, -path, -x3p, -CrossCut), 5)
 
-Grooves_173 <- df %>% tidyr::unnest(Grooves)
-Grooves_252 <- df2 %>% tidyr::unnest(Grooves)
+# Need to check the grooves and set manually for now...
+```
+# When run in interactive mode, a shiny app can be used to set smarter grooves.
+```{r get-grooves-interactive, echo = FALSE}
+library(shiny)
 
-head(df, 500)
-head(Grooves_173, 5)
-#head(Grooves_252, 1000)
+hamby <- hamby %>%
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-"))
+
+saved_grooves_location <- "H173_H252_Grooves_data.rda"
+if (file.exists(saved_grooves_location)) {
+  hamby$Grooves <- readRDS(saved_grooves_location)
+}
+
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(hamby$Grooves)) %>% set_names(hamby$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- hamby$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", hamby$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", hamby$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(hamby$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(hamby$Grooves)) %>% set_names(hamby$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(hamby$Grooves, file = saved_grooves_location)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- hamby$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          hamby$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          hamby$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- hamby$Grooves[[k]]$plot +
+            geom_vline(xintercept = hamby$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = hamby$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(hamby$Grooves, file = saved_grooves_location)
+} else {
+  if (!file.exists(saved_grooves_location)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    hamby$Grooves <- readRDS(saved_grooves_location)
+  }
+}
 
 ```
 
 ```{r}
 #Signatures
-df <- df %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_173
+hamby <- hamby %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_173
 
-df2 <- df2 %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) #Obtaining Signatures Hamby_252
-
-Signatures_173 <- df %>% select(path, Signatures) %>% tidyr::unnest() %>% filter(is.na(sig), is.na(raw_sig))
-Signatures_252 <- df2 %>% select(path, Signatures) %>% tidyr::unnest() %>% filter(is.na(sig), is.na(raw_sig))
-
-head(df, 5)
-head(Signatures_173, 5)
+Signatures <- hamby %>% select(id, Set, Barrel, Bullet, Land, Signatures) %>% tidyr::unnest()
+head(Signatures, 5)
 #head(Grooves_252, 1000)
 
+qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
+Signatures %>%
+  filter(Barrel != "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line() + 
+  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel)) # put the barrels in the right order
+# Looking for major issues - grooves not set correctly (large deviations at beginning or end of a line)
 ```
 
 ```{r}
 
+comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
+  left_join(nest(hamby, -id) %>% set_names(c("Bullet1")))
 dfx <- df %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land) 
 
 df2x<- df2 %>% mutate(Bullet_Land = paste(Barrel, Bullet, Land, sep = "-")) %>% nest(-Bullet_Land)
