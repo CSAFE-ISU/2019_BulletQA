@@ -129,7 +129,7 @@ crosscuts %>%
 
 ```{r}
 #Grooves
-saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
+saved_grooves_location <- "V2H173_H252_Grooves_data.rda" # .rda file seems to be created with later version of R
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
 } else {
