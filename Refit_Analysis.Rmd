@@ -146,6 +146,7 @@ plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 ```
 
 ### Examining Groove Cut Offs
+######Same as rollapply? Do not think Grooves file loaded.
 
 ```{r}
 
@@ -265,7 +266,7 @@ if (interactive()) { # only run when you're manually running chunks... don't run
   } else {
     hamby$Grooves <- readRDS(saved_grooves_location)
   }
-}
+} 
 ```
 
 ```{r}
