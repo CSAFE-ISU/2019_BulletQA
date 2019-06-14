@@ -79,14 +79,27 @@ hamby <- hamby %>%
 head(select(hamby, -path, -x3p), 5)
 #hamby %>% arrange(desc(CrossSection))
 
+hamby %>% 
+  filter(Barrel != "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+        ggtitle("Barrels 1-10")
+
+hamby %>% 
+  filter(Barrel == "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+        ggtitle("Barrel Unknown")
+
 ```
 
 ```{r}
 #Cross Sections
 hamby <- hamby %>% 
   mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
 crosscuts <- select(hamby, -path, -x3p) %>% 
-  tidyr::unnest(CrossCut)
+      tidyr::unnest(CrossCut)
 ```
 
 # For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
@@ -129,7 +142,7 @@ crosscuts %>%
 
 ```{r}
 #Grooves
-saved_grooves_location <- "V2H173_H252_Grooves_data.rda" # .rda file seems to be created with later version of R
+saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
 } else {
@@ -146,7 +159,6 @@ plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 ```
 
 ### Examining Groove Cut Offs
-######Same as rollapply? Do not think Grooves file loaded.
 
 ```{r}
 
@@ -266,7 +278,13 @@ if (interactive()) { # only run when you're manually running chunks... don't run
   } else {
     hamby$Grooves <- readRDS(saved_grooves_location)
   }
-} 
+}
+
+
+#Test Some Grooves(performed:06/12/19)
+
+
+
 ```
 
 ```{r}
@@ -274,10 +292,10 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 hamby <- hamby %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
 Signatures <- hamby %>% select(id, Set, Barrel, Bullet, Land, Signatures) %>% tidyr::unnest()
 head(Signatures, 5)
-#head(Grooves_252, 1000)
+
 ```
 
-## Signature comparisons between Bullet 1 and Bullet 2. Looking for noticeable differences.
+## There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1]. Looking for noticeable differences, we see that there is missing values when plotting the Bullet 1 and Bullet 2.  This is hard to see when plotting the Lands.
 ```{r}
 #Looking for major issues - grooves not set correctly (large deviations at beginning or end of a line)
 Signatures %>%
@@ -285,6 +303,12 @@ Signatures %>%
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line() + 
   facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))# put the barrels in the right order
+
+Signatures %>%
+  filter(Barrel != "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Bullet)) + 
+  geom_line() + 
+  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))# Notice the difference
 
 Signatures %>% 
   filter(Barrel == 1) %>% 
@@ -322,8 +346,8 @@ Signatures %>%
     filter(Set == "Hamby252") %>%
       ggplot(aes(x = x, y = sig, color = id))+
         geom_line() + facet_wrap(~Bullet) + theme_bw()
-#qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
 
+qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
 
 
 ```
@@ -399,14 +423,6 @@ head(comparisons, 50)
 
 ```
 
-
-##Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
-
-### Based on these summary statistics there are a few concerns with the data. The values given for cms, non_cms, mismatches, and D are very low.  The statistics for D seem extremely low and are not making a lot of sense.
-
-#### We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to 50, then it is a Known match.  If the ccf is less than 50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from 50 to around 70 and up.  
-
-
 ```{r}
 comparisons %>% select(ccf, cms, non_cms, matches, mismatches, D, sum_peaks) %>% summary()
 
@@ -429,5 +445,115 @@ rm(HambyDataLong) # File size is large, just for  convenience sake.
 
 ```
 
+Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
 
+Based on these summary statistics there are a few concerns with the data. The values given for cms, non_cms, mismatches, and D are very low.  The statistics for D seem extremely low and are not making a lot of sense.
+
+We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to 50, then it is a Known match.  If the ccf is less than 50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from 50 to around 70 and up.
+
+```{r}
+comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
+head(comparisons)
+
+Bullet_Scores <- comparisons %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores <- Bullet_Scores %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores %>% select(-data) %>% arrange(desc(Bullet_Score))
+
+Bullet_Scores <- Bullet_Scores %>% 
+  mutate(data = data %>% future_map(.f = function(d){
+  d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores %>% tidyr::unnest(data) 
+```
+
+
+
+
+
+## Looking at the land-land matching scores for bullets 1 and 2. We plotted an example when the bullets came from the same barrel and when the bullets came from different barrels. The matrixs shown for bullets 1 and 2 that come from the same barrel looks promising but rfscores seem lower than expected.
+```{r}
+library(gridExtra)
+head(comparisons)
+
+plot1 = comparisons %>%
+  filter(BarrelA == 10 & BarrelB == 10) %>% 
+    filter(BulletA == 1 & BulletB == 1 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source and Same Bullet")+ facet_grid(~Set)
+
+plot2 = comparisons %>%
+  filter(BarrelA == 10 & BarrelB == 10) %>% 
+    filter(BulletA == 1 & BulletB == 2 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source but Different Bullet")+ facet_grid(~Set)
+
+
+plot3 = comparisons %>% 
+  filter(BarrelA == 10 & BarrelB == 5) %>% 
+    filter(BulletA == 1 & BulletB == 2 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Different Source")+ facet_grid(~Set)
+
+grid.arrange(plot1, plot2, plot3, ncol = 2)
+
+```
+
+#Statistical Summary Comparions between bulletxtrctr demo and Refit_Analysis
+
+```{r}
+comparisons %>% 
+  select(ccf, rough_cor, D, signature_length, matches, mismatches, cms, non_cms, sum_peaks, rfscore) %>% 
+    summary()
+
+```
+
+
+I wanted to see how the summary statistics for certain features compared with the bulletxtrctr demo and Refit_Analysis.  The results were pretty similar even though the data for Refit_Analysis is much bigger than the bulletxtrctr demo.  There were some noticeable difference though:
+  
+The Max Distance for Refit_Analysis was .02, while the max distance for bulletxtrctr demo was .005
+
+Matches and Mismatches varied a little for both but showed very similar outputs.
+
+For Bulletxtrctr demo the cms had a mean of 1.6845 and a max of 9.5188.  The non_cms had a mean of 3.531 and a max of 8.457.
+For Refit_Analysis the cms had a mean of 1.0509 and a max of 15.9357.  The non_cms had a mean of 6.144 and a max of 20.408. 
+
+The mean rfscore for bulletxtrctr demo was 0.189329.
+The mean rfscore for Refit_Analysis was 0.093215.  
+
+```{r}
+head(comparisons)
+head(Signatures)
+
+comparisons %>% filter(KM_KNM == "Known_Match" & rfscore <= .50) %>% arrange(rfscore)
+
+Signatures %>% 
+  filter(id == "Hamby173-10-2-1" | id == "Hamby173-Unknown-I-6") %>% 
+    ggplot(aes(x = x, y = sig, color = id))+
+      geom_line()+ 
+        facet_wrap(~Bullet)+ 
+          theme_bw() #Known Match and low rfscore
+
+
+Signatures %>% 
+  filter(id == "Hamby252-Unknown-C-2" | id == "Hamby252-1-2-6") %>% 
+    ggplot(aes(x = x, y = sig, color = id))+
+      geom_line()+ 
+        facet_wrap(~Bullet)+ 
+          theme_bw() #Known non Match and high rfscore
+
+```
 
