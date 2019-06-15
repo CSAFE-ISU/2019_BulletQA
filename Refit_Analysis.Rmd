@@ -9,8 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
+# R Markdown
 ```{r}
 #Loading Packages
 #Will most likely add more
@@ -43,8 +42,7 @@ df <- tibble(path = list.files(path = "Hamby_173",
            str_remove("land")) %>% 
   mutate(Set = "Hamby173") %>%
   mutate(x3p = future_map(path, read_x3p)) %>%
-  # Adjust orientation
-# I rewrote this so it's a bit clearer. The ~ notation in purrr is pretty concise - no need to define new functions inline.
+ 
   mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
 
 # Reading in Hamby_252
@@ -69,29 +67,36 @@ hamby <- hamby %>%
 rm(df, df2)
 ```
 
-#Cross Sections look good.  Barrel Unknown Bullet B has a pretty high CrossSection of 400
+# Cross Sections look good.
 ```{r}
 plan(multicore) # use all the cores at once
 hamby <- hamby %>%
   mutate(
-    CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25)
-  )
+    CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25))
+
 head(select(hamby, -path, -x3p), 5)
 #hamby %>% arrange(desc(CrossSection))
 
-hamby %>% 
+plot1 = hamby %>% 
   filter(Barrel != "Unknown") %>% 
     ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
       geom_boxplot()+
-        ggtitle("Barrels 1-10")
+          ggtitle("Barrels 1-10")
 
-hamby %>% 
+plot2 = hamby %>% 
   filter(Barrel == "Unknown") %>% 
     ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
       geom_boxplot()+
-        ggtitle("Barrel Unknown")
+          ggtitle("Barrel Unknown")
+
+grid.arrange(plot1, plot2)
 
 ```
+
+Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges seem to be roughly the same for each Bullet.  For Barrels 1-10, Bullet 2 seems to have higher values than Bullet 1.  Barrels 6 and 7 have largest whiskers.  Barrel 1 Bullet 1 has the smallest inter-quartile range and Barrel 9 Bullet 2 has the largest interquartile range.  There is one apparent outlier for Barrel 10 Bullet 1.  This CrossSection Value is not high enough for concern when looking at all Barrels but should be examined separately.
+
+Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
+
 
 ```{r}
 #Cross Sections
@@ -100,46 +105,59 @@ hamby <- hamby %>%
 
 crosscuts <- select(hamby, -path, -x3p) %>% 
       tidyr::unnest(CrossCut)
+
+crosscuts %>% 
+  arrange(desc(CrossSection))
 ```
 
-# For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
+#### For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
 
-# For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
+#### For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
 
 ```{r}
 #Looking at CrossCuts to see any issues
 
 crosscuts %>%
   filter(Barrel != "Unknown" & Set == "Hamby173") %>% 
-ggplot(data = ., aes(x = x, y = value, color = Land)) + 
-  geom_line() + 
-  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
 
 crosscuts %>%
   filter(Barrel != "Unknown" & Set == "Hamby252") %>% 
-ggplot(data = ., aes(x = x, y = value, color = Land)) + 
-  geom_line() + 
-  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
 
 crosscuts %>% 
   filter(Set == "Hamby173" & Barrel == "Unknown") %>%
-  ggplot(aes(x = x, y = value)) + 
-  geom_line() +
-  facet_grid(Bullet~Land, labeller="label_both") +
-  theme_bw()+ ggtitle("Barrel 1")
+    ggplot(aes(x = x, y = value)) + 
+      geom_line() +
+        facet_grid(Bullet~Land, labeller="label_both") +
+          theme_bw()+ ggtitle("Barrel Unknown for Hamby173")
 
 crosscuts %>% 
   filter(Set == "Hamby252" & Barrel == "Unknown") %>%
-  ggplot(aes(x = x, y = value)) + 
-  geom_line() +
-  facet_grid(Bullet~Land, labeller="label_both") +
-  theme_bw()+ ggtitle("Barrel 1")
+    ggplot(aes(x = x, y = value)) + 
+      geom_line() +
+        facet_grid(Bullet~Land, labeller="label_both") +
+          theme_bw()+ ggtitle("Barrel Unknown for Hamby252")
+
+crosscuts %>% filter(id == "Hamby252-Unknown-B-2") %>% 
+  ggplot(aes(x = x, y = value))+
+    geom_line()+
+      facet_grid(Bullet~Land + Set, labeller = "label_both")+
+        theme_bw() + ggtitle("High CrossSection Bullet B")
 
 
 ```
 
-#### Groved Data taken from github
+Looking at the CrossCuts we can see the side profile for a bullets land impression for every barrel in Hamby173 and Hamby252.  For most of the CrossCuts the shoulders can be clearly identified but there are some that can not be "clearly" identified due to possbile tank rash, pitting, or scans that do not meet the standards that forensic analysis require.  I can not say for certain if there are scans that should be excluded.  I used FIX3P to examine the "groove to groove" scans and noticed considerable tank rash on some of the scans.  There was some noticeable pitting as well but I only felt it was a concern when the pitting was concentrated in the center of the "groove to groove" scan.
 
+When looking at the Crosscuts we can see most have noticeable curvature.  There are some scans that do not and these scans can look like a flat line or even a traingle... I Have made note of these particular scans as well.  
+
+
+# Groved Data taken from github
 ```{r}
 #Grooves
 saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
@@ -151,31 +169,50 @@ if (file.exists(saved_grooves_location)) {
              future_map(.f = cc_locate_grooves, 
                         method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
 }
+
 grooves <- hamby %>% tidyr::unnest(Grooves)
+
 head(grooves, 10)
+
 head(select(hamby, -path, -x3p, -CrossCut), 5)
-# Need to check the grooves and set manually for now...
+
+
 plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 ```
 
-### Examining Groove Cut Offs
 
+# Examining Groove Cut Offs
 ```{r}
 
-Hamby_test <- hamby %>% filter(Set == "Hamby252") %>% filter(Barrel == 6)
-head(Hamby_test)
+Hamby_test <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 6)
 
-Hamby_test2 <- hamby %>% filter(Set == "Hamby252") %>% filter(Barrel == 3 & Bullet == 1)
+Hamby_test2 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 3 & Bullet == 1)
 
-Hamby_test3 <- hamby %>% filter(Set == "Hamby252") %>% filter(Barrel == 1 & Bullet == 1)
+Hamby_test3 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 1 & Bullet == 1)
 
-Hamby_test4 <- hamby %>% filter(Set == "Hamby252") %>% filter(Barrel == 9 & Bullet == 2)
+Hamby_test4 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 9 & Bullet == 2)
 
-Hamby_test5 <- hamby %>% filter(Set == "Hamby252") %>% filter(Barrel == "Unknown") %>% filter(Bullet == "B" | Bullet == "S" | Bullet == "U")
+Hamby_test5 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == "Unknown") %>% 
+      filter(Bullet == "B" | Bullet == "S" | Bullet == "U")
 
-Hamby_test6 <- hamby %>% filter(Set == "Hamby173") %>% filter(Barrel == 3 & Bullet == 2)
+Hamby_test6 <- hamby %>% 
+  filter(Set == "Hamby173") %>% 
+    filter(Barrel == 3 & Bullet == 2)
 
-Hamby_test7 <- hamby%>% filter(Set == "Hamby173") %>% filter(Barrel == "Unknown") %>% filter(Bullet == "B" | Bullet == "E" | Bullet == "U")
+Hamby_test7 <- hamby %>% 
+  filter(Set == "Hamby173") %>% 
+    filter(Barrel == "Unknown") %>% 
+      filter(Bullet == "B" | Bullet == "E" | Bullet == "U")
 
 
 gridExtra::grid.arrange(Hamby_test$Grooves[[1]]$plot,
@@ -282,9 +319,6 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 
 
 #Test Some Grooves(performed:06/12/19)
-
-
-
 ```
 
 ```{r}
@@ -295,7 +329,6 @@ head(Signatures, 5)
 
 ```
 
-## There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1]. Looking for noticeable differences, we see that there is missing values when plotting the Bullet 1 and Bullet 2.  This is hard to see when plotting the Lands.
 ```{r}
 #Looking for major issues - grooves not set correctly (large deviations at beginning or end of a line)
 Signatures %>%
@@ -347,10 +380,13 @@ Signatures %>%
       ggplot(aes(x = x, y = sig, color = id))+
         geom_line() + facet_wrap(~Bullet) + theme_bw()
 
-qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
+#qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
 
 
 ```
+Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 and Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
+
+There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
 
 ```{r}
 comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
@@ -371,16 +407,21 @@ get_sig <- function(data) {
 }
 comparisons <- comparisons %>%
   mutate(sig1 = purrr::map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
+
 plan(multicore)
+
 comparisons <- comparisons %>%
   mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y))))
+
 # Get striae
 comparisons <- comparisons %>%
   mutate(Striae = future_map(Aligned, sig_cms_max))
+
 saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
 
 ```
 
+# Extracting features
 ```{r}
 comparisons <- comparisons %>% 
   select(-Bullet1_data, -Bullet2_data)
@@ -400,7 +441,7 @@ head(comparisons)
 ```
 
 
-##### Creating Columns for organization and for future plotting purposes.
+# Creating Columns for organization and for future plotting purposes.
 ```{r}
 comparisons <- tibble::rowid_to_column(comparisons, "Index")
 
@@ -447,7 +488,7 @@ rm(HambyDataLong) # File size is large, just for  convenience sake.
 
 Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
 
-We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to .50, then it is a Known match.  If the ccf is less than .50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from 50 to around 70 and up.
+We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to 50, then it is a Known match.  If the ccf is less than 50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from 50 to around 70 and up.
 
 ```{r}
 comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
@@ -476,7 +517,7 @@ Bullet_Scores %>% tidyr::unnest(data)
 
 
 
-## Looking at the land-land matching scores for bullets 1 and 2. We plotted an example when the bullets came from the same barrel and when the bullets came from different barrels. The matrixs shown for bullets 1 and 2 that come from the same barrel looks promising but rfscores seem lower than expected.
+# Comparing rfscores
 ```{r}
 library(gridExtra)
 head(comparisons)
@@ -494,8 +535,10 @@ plot2 = comparisons %>%
     filter(BulletA == 1 & BulletB == 2 ) %>% 
       ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
         geom_tile()+ 
-          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
-            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source but Different Bullet")+ facet_grid(~Set)
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
+            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ 
+              ggtitle("Same Source but Different Bullet") + facet_grid(~Set)
 
 
 plot3 = comparisons %>% 
@@ -503,12 +546,18 @@ plot3 = comparisons %>%
     filter(BulletA == 1 & BulletB == 2 ) %>% 
       ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
         geom_tile()+ 
-          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
-            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Different Source")+ facet_grid(~Set)
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
+            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ 
+              ggtitle("Different Source") + facet_grid(~Set)
 
 grid.arrange(plot1, plot2, plot3, ncol = 2)
 
 ```
+
+Looking at the land-land matching scores for bullets 1 and 2. We plotted an example when the bullets came from the same barrel and when the bullets came from different barrels. The matrix shown for bullets 1 and 2 that came from the same barrel look promising but rfscores seem lower than expected.
+
+
 
 #Statistical Summary Comparions between bulletxtrctr demo and Refit_Analysis
 
