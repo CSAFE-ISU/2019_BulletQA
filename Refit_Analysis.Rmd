@@ -93,7 +93,7 @@ grid.arrange(plot1, plot2)
 
 ```
 
-Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges seem to be roughly the same for each Bullet.  For Barrels 1-10, Bullet 2 seems to have higher values than Bullet 1.  Barrels 6 and 7 have largest whiskers.  Barrel 1 Bullet 1 has the smallest inter-quartile range and Barrel 9 Bullet 2 has the largest interquartile range.  There is one apparent outlier for Barrel 10 Bullet 1.  This CrossSection Value is not high enough for concern when looking at all Barrels but should be examined separately.
+Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges seem to be roughly the same for each Bullet.  For Barrels 1-10, Bullet 2 seems to have higher values than Bullet 1.  Barrels 6 and 7 have the largest whiskers.  Barrel 1, Bullet 1 has the smallest inter-quartile range and Barrel 9, Bullet 2 has the largest interquartile range.  There is one apparent outlier for Barrel 10, Bullet 1.  This CrossSection Value is not high enough for concern when looking at all Barrels but should be examined separately.
 
 Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
 
@@ -384,7 +384,7 @@ Signatures %>%
 
 
 ```
-Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 and Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
+Examining the Signature Profiles we can see for barrels 1-10 and for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
 
 There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
 
@@ -480,6 +480,13 @@ HambyDataLong %>%
           scale_fill_brewer(palette = "Paired") + theme_bw()+
             ggtitle("Marginal Density for Features")
 
+HambyDataLong %>% 
+    ggplot(aes(value, fill = KM_KNM))+
+      geom_density(position = "identity", alpha = 0.50)+
+        facet_wrap(~measure + Set, ncol = 4, scale = "free")+
+          scale_fill_brewer(palette = "Paired") + theme_bw()+
+            ggtitle("Marginal Density for Features")
+
 head(HambyDataLong)
 
 rm(HambyDataLong) # File size is large, just for  convenience sake.
@@ -488,7 +495,7 @@ rm(HambyDataLong) # File size is large, just for  convenience sake.
 
 Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
 
-We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to 50, then it is a Known match.  If the ccf is less than 50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from 50 to around 70 and up.
+We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to .50, then it is a Known match.  If the ccf is less than .50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from .50 to around .70 and up.  I also plotted the Density Plots by "Set" but separation did not occur until ccf condition was increased to .70's. 
 
 ```{r}
 comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
