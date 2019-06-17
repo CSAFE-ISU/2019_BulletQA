@@ -388,6 +388,8 @@ Examining the Signature Profiles we can see for barrels 1-10 and for both Hamby1
 
 There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
 
+We also examine the number of consecutively matching peaks in signatures for two aligned lands.(Case Validation Paper)
+
 ```{r}
 comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
   left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
@@ -490,8 +492,8 @@ HambyDataLong %>%
 head(HambyDataLong)
 
 rm(HambyDataLong) # File size is large, just for  convenience sake.
-
 ```
+
 
 Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
 
@@ -520,8 +522,22 @@ Bullet_Scores <- Bullet_Scores %>%
 Bullet_Scores %>% tidyr::unnest(data) 
 ```
 
+```{r}
+
+Bullet_Scores_Examin <- Bullet_Scores %>% tidyr::unnest(data)
+
+Bullet_Scores_Examin %>% filter(samepath == "TRUE")
 
 
+Bullet_Scores_Examin %>% filter(samepath == "FALSE")
+```
+
+
+Looking at whether two lands have the same source
+samepath = 324 TRUEs
+samepath = 87,876 FALSEs 
+
+Looking at the variable "samepath" or in demo "samesource" we see that only Barrel "Unknown" for both Hamby173 and Hamby252 are said to be from same source.  
 
 
 # Comparing rfscores
