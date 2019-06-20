@@ -323,68 +323,42 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 
 ```{r}
 #Signatures
-hamby <- hamby %>% mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
-Signatures <- hamby %>% select(id, Set, Barrel, Bullet, Land, Signatures) %>% tidyr::unnest()
+hamby <- hamby %>% 
+  mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
+
+Signatures <- hamby %>% 
+  select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
+    tidyr::unnest()
+
 head(Signatures, 5)
 
 ```
 
 ```{r}
 #Looking for major issues - grooves not set correctly (large deviations at beginning or end of a line)
+
 Signatures %>%
   filter(Barrel != "Unknown") %>% 
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
-  geom_line() + 
-  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))# put the barrels in the right order
+  geom_line()+
+  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel)) # put the barrels in the right order
 
 Signatures %>%
-  filter(Barrel != "Unknown") %>% 
-ggplot(data = ., aes(x = x, y = sig, color = Bullet)) + 
-  geom_line() + 
-  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))# Notice the difference
+  filter(Set == "Hamby173") %>%
+  filter(Barrel == "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line()+
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
 
-Signatures %>% 
-  filter(Barrel == 1) %>% 
-    filter(Set == "Hamby173") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet)+ theme_bw()
-
-Signatures %>% 
-  filter(Barrel == 9) %>% 
-    filter(Set == "Hamby173") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet) + theme_bw()
-
-Signatures %>% 
-  filter(Barrel == 10) %>% 
-    filter(Set == "Hamby173") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet) + theme_bw()
-
-#-------------------------------------------------------------------------------------------------------
-Signatures %>% 
-  filter(Barrel == 1) %>% 
-    filter(Set == "Hamby252") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet) + theme_bw()
-
-Signatures %>% 
-  filter(Barrel == 6) %>% 
-    filter(Set == "Hamby252") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet) + theme_bw()
-
-Signatures %>% 
-  filter(Barrel == 10) %>% 
-    filter(Set == "Hamby252") %>%
-      ggplot(aes(x = x, y = sig, color = id))+
-        geom_line() + facet_wrap(~Bullet) + theme_bw()
-
-#qplot(data = filter(Signatures, id %in% unique(id)[1:6]), x = x, y = sig, geom = "line", color = id) # Plot a few to see what they look like
-
+Signatures %>%
+  filter(Set == "Hamby252") %>%
+  filter(Barrel == "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line()+
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
 
 ```
-Examining the Signature Profiles we can see for barrels 1-10 and for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
+Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
 
 There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
 
@@ -445,8 +419,6 @@ head(comparisons)
 
 # Creating Columns for organization and for future plotting purposes.
 ```{r}
-comparisons <- tibble::rowid_to_column(comparisons, "Index")
-
 comparisons <- comparisons %>% 
   mutate(Set = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Bullet2))
 comparisons <- comparisons %>% 
@@ -461,12 +433,168 @@ comparisons <- comparisons %>%
   mutate(LandA = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\4", Bullet2))
 comparisons <- comparisons %>% 
   mutate(LandB = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\4", Bullet1))
+head(comparisons, 500)
+```
 
-head(comparisons, 50)
+```{r}
+
+features_2017 <- read_csv("features-hamby.csv")
+
+features_2017 <- features_2017 %>%
+  select(-compare_id, -profile1_id, -profile2_id, -land1_id, -land2_id) %>%
+    filter(study1 != "Cary" & study2 != "Cary") %>%
+      rename(BarrelB = barrel1, BulletB = bullet1, LandB = land1) %>%
+      rename(BarrelA = barrel2, BulletA = bullet2, LandA = land2) %>%
+        select(-study1) %>%
+      rename(Set = study2) %>%
+          mutate(Set = gsub("Hamby44", "Hamby173", Set)) %>%
+            mutate(Set = factor(Set, levels = c("Hamby173", "Hamby252"))) %>%
+      rename(ccf2 = ccf, rough_cor2 = rough_cor, lag2 = lag, D2 = D, sd_D2 = sd_D, signature_length2 = signature_length, overlap2 = overlap, matches2 = matches, mismatches2 = mismatches, cms2x = cms, non_cms2 = non_cms, sum_peaks2 = sum_peaks)
+
+
+#Exploring we see that all lettered Barrels only have bullet equal to 1. No need to worry about a lettered barrel having a bullet 2
+
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "A"] <- "A")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "B"] <- "B")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "C"] <- "C")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "D"] <- "D")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "E"] <- "E")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "F"] <- "F")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "G"] <- "G")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "H"] <- "H")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "I"] <- "I")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "J"] <- "J")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "L"] <- "L")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "M"] <- "M")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "N"] <- "N")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Q"] <- "Q")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "R"] <- "R")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "S"] <- "S")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "U"] <- "U")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "V"] <- "V")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "W"] <- "W")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "X"] <- "X")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Y"] <- "Y")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Z"] <- "Z")
+
+features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "B"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "C"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "D"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "E"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "F"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "G"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "H"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "I"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "J"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "L"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "M"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "N"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "Q"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "R"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "S"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "U"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "V"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "W"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "X"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "Y"] <- "Unknown"
+features_2017$BarrelA[features_2017$BarrelA == "Z"] <- "Unknown"
+      
+features_2017 <- features_2017 %>% 
+  mutate(Bullet1 = paste(Set, BarrelB, BulletB, LandB, sep = "-"),
+         Bullet2 = paste(Set, BarrelA, BulletA, LandA, sep = "-"))
+
+
+features_2017 <- features_2017[order(features_2017$Set), ]
+
+#At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
+
+#table(comparisons$Set)
+#table(features_2017$Set)
+
+features_2017 <- features_2017 %>% 
+  mutate(BarrelB = as.character(BarrelB), 
+         BulletA = as.character(BulletA), 
+         BulletB = as.character(BulletB), 
+         LandA = as.character(LandA), 
+         LandB = as.character(LandB))
 
 ```
 
 ```{r}
+table(comparisons$BarrelA)
+table(comparisons$BulletA)
+table(comparisons$LandA)
+
+#----------------------------------------------------------------#
+
+table(features_2017$BarrelA)
+table(features_2017$BulletA)
+table(features_2017$LandA)
+
+#----------------------------------------------------------------#
+
+```
+
+
+```{r}
+Feature_Comparisons <- inner_join(comparisons, features_2017)
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = ccf, y = ccf2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = rough_cor, y = rough_cor2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = lag, y = lag2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = D, y = D2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = sd_D, y = sd_D2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = signature_length, y = signature_length2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = overlap, y = overlap2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = matches, y = matches2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = mismatches, y = mismatches2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = cms, y = cms2x))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = non_cms, y = non_cms2))+
+    geom_point()
+
+Feature_Comparisons %>% 
+  ggplot(aes(x = sum_peaks, y = sum_peaks2))+
+    geom_point()
+
+
+```
+
+
+
+
+```{r eval=FALSE, include=FALSE}
 comparisons %>% select(ccf, cms, non_cms, matches, mismatches, D, sum_peaks) %>% summary()
 
 comparisons <- comparisons %>% 
@@ -492,6 +620,7 @@ HambyDataLong %>%
 head(HambyDataLong)
 
 rm(HambyDataLong) # File size is large, just for  convenience sake.
+rm(lines)
 ```
 
 
@@ -499,9 +628,9 @@ Looking at the summary statistics for some of the features extracted we can see 
 
 We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to .50, then it is a Known match.  If the ccf is less than .50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from .50 to around .70 and up.  I also plotted the Density Plots by "Set" but separation did not occur until ccf condition was increased to .70's. 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
-head(comparisons)
+head(comparisons, 500)
 
 Bullet_Scores <- comparisons %>% 
   group_by(BulletA, BulletB) %>% 
@@ -522,7 +651,7 @@ Bullet_Scores <- Bullet_Scores %>%
 Bullet_Scores %>% tidyr::unnest(data) 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 Bullet_Scores_Examin <- Bullet_Scores %>% tidyr::unnest(data)
 
@@ -537,16 +666,16 @@ Looking at whether two lands have the same source
 samepath = 324 TRUEs
 samepath = 87,876 FALSEs 
 
-Looking at the variable "samepath" or in demo "samesource" we see that only Barrel "Unknown" for both Hamby173 and Hamby252 are said to be from same source.  
+Looking at the variable "samepath" or in demo "samesource" we see that only Barrel "Unknown" bullets from both Hamby173 and Hamby252 are said to be from same source.  
 
 
 # Comparing rfscores
-```{r}
+```{r eval=FALSE, include=FALSE}
 library(gridExtra)
-head(comparisons)
+head(comparisons, 500)
 
 plot1 = comparisons %>%
-  filter(BarrelA == 10 & BarrelB == 10) %>% 
+  filter(BarrelA == 2 & BarrelB == 2) %>% 
     filter(BulletA == 1 & BulletB == 1 ) %>% 
       ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
         geom_tile()+ 
@@ -554,7 +683,7 @@ plot1 = comparisons %>%
             xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source and Same Bullet")+ facet_grid(~Set)
 
 plot2 = comparisons %>%
-  filter(BarrelA == 10 & BarrelB == 10) %>% 
+  filter(BarrelA == 2 & BarrelB == 2) %>% 
     filter(BulletA == 1 & BulletB == 2 ) %>% 
       ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
         geom_tile()+ 
@@ -584,7 +713,7 @@ Looking at the land-land matching scores for bullets 1 and 2. We plotted an exam
 
 #Statistical Summary Comparions between bulletxtrctr demo and Refit_Analysis
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 comparisons %>% 
   select(ccf, rough_cor, D, signature_length, matches, mismatches, cms, non_cms, sum_peaks, rfscore) %>% 
     summary()
@@ -604,26 +733,5 @@ For Refit_Analysis the cms had a mean of 1.0509 and a max of 15.9357.  The non_c
 The mean rfscore for bulletxtrctr demo was 0.189329.
 The mean rfscore for Refit_Analysis was 0.093215.  
 
-```{r}
-head(comparisons)
-head(Signatures)
 
-comparisons %>% filter(KM_KNM == "Known_Match" & rfscore <= .50) %>% arrange(rfscore)
-
-Signatures %>% 
-  filter(id == "Hamby173-10-2-1" | id == "Hamby173-Unknown-I-6") %>% 
-    ggplot(aes(x = x, y = sig, color = id))+
-      geom_line()+ 
-        facet_wrap(~Bullet)+ 
-          theme_bw() #Known Match and low rfscore
-
-
-Signatures %>% 
-  filter(id == "Hamby252-Unknown-C-2" | id == "Hamby252-1-2-6") %>% 
-    ggplot(aes(x = x, y = sig, color = id))+
-      geom_line()+ 
-        facet_wrap(~Bullet)+ 
-          theme_bw() #Known non Match and high rfscore
-
-```
 
