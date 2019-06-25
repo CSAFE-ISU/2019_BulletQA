@@ -387,11 +387,11 @@ comparisons <- comparisons %>%
 plan(multicore)
 
 comparisons <- comparisons %>%
-  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y))))
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
 
 # Get striae
 comparisons <- comparisons %>%
-  mutate(Striae = future_map(Aligned, sig_cms_max))
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
 
 saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
 
@@ -402,16 +402,16 @@ saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252
 comparisons <- comparisons %>% 
   select(-Bullet1_data, -Bullet2_data)
 
-plan(multicore(workers = availableCores(constraints = 8)))
+plan(multicore(workers = availableCores(constraints = 8))) # Core Restraint so server does not die 
 
 comparisons <- comparisons %>% 
-  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625))
+  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625)) #ObtainingFeatures
 
 comparisons <- comparisons %>% 
-  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625))
+  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
 
 comparisons <- comparisons %>% 
-  tidyr::unnest(Legacy_Features)
+  tidyr::unnest(Legacy_Features) # Extracting feature legacy
 
 head(comparisons)
 ```
@@ -420,7 +420,7 @@ head(comparisons)
 # Creating Columns for organization and for future plotting purposes.
 ```{r}
 comparisons <- comparisons %>% 
-  mutate(Set = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Bullet2))
+  mutate(Set = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Bullet2)) # Creating columns from IDs
 comparisons <- comparisons %>% 
   mutate(BarrelA = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Bullet2))
 comparisons <- comparisons %>% 
@@ -438,23 +438,25 @@ head(comparisons, 500)
 
 ```{r}
 
-features_2017 <- read_csv("features-hamby.csv")
+features_2017 <- read_csv("features-hamby.csv") #Reading in csv
+
 
 features_2017 <- features_2017 %>%
-  select(-compare_id, -profile1_id, -profile2_id, -land1_id, -land2_id) %>%
-    filter(study1 != "Cary" & study2 != "Cary") %>%
-      rename(BarrelB = barrel1, BulletB = bullet1, LandB = land1) %>%
-      rename(BarrelA = barrel2, BulletA = bullet2, LandA = land2) %>%
+  select(-land1_id, -land2_id) %>% # removing
+    filter(study1 != "Cary" & study2 != "Cary") %>% # removing
+      rename(BarrelB = barrel1, BulletB = bullet1, LandB = land1) %>% # Changed column names
+      rename(BarrelA = barrel2, BulletA = bullet2, LandA = land2) %>% # Changed column names
         select(-study1) %>%
       rename(Set = study2) %>%
-          mutate(Set = gsub("Hamby44", "Hamby173", Set)) %>%
-            mutate(Set = factor(Set, levels = c("Hamby173", "Hamby252"))) %>%
-      rename(ccf2 = ccf, rough_cor2 = rough_cor, lag2 = lag, D2 = D, sd_D2 = sd_D, signature_length2 = signature_length, overlap2 = overlap, matches2 = matches, mismatches2 = mismatches, cms2x = cms, non_cms2 = non_cms, sum_peaks2 = sum_peaks)
+          mutate(Set = gsub("Hamby44", "Hamby173", Set)) %>% #Chnaging observation name
+            mutate(Set = factor(Set, levels = c("Hamby173", "Hamby252"))) %>% # for ordering principles
+      rename(ccf2 = ccf, rough_cor2 = rough_cor, lag2 = lag, D2 = D, sd_D2 = sd_D, signature_length2 = signature_length, overlap2 = overlap, matches2 = matches, mismatches2 = mismatches, cms2x = cms, non_cms2 = non_cms, sum_peaks2 = sum_peaks) # Column names changed for comparing purposes 
 
 
 #Exploring we see that all lettered Barrels only have bullet equal to 1. No need to worry about a lettered barrel having a bullet 2
+# Code will not look like this forever... Duct Tape... Will Dplyr soon...
 
-features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "A"] <- "A")
+features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "A"] <- "A") #Assign A to Bullets with column "BarrelA" equalequal to "A"
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "B"] <- "B")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "C"] <- "C")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "D"] <- "D")
@@ -477,7 +479,30 @@ features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "X"] <-
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Y"] <- "Y")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Z"] <- "Z")
 
-features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown"
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "A"] <- "A")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "B"] <- "B")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "C"] <- "C")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "D"] <- "D")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "E"] <- "E")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "F"] <- "F")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "G"] <- "G")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "H"] <- "H")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "I"] <- "I")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "J"] <- "J")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "L"] <- "L")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "M"] <- "M")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "N"] <- "N")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Q"] <- "Q")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "R"] <- "R")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "S"] <- "S")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "U"] <- "U")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "V"] <- "V")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "W"] <- "W")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "X"] <- "X")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Y"] <- "Y")
+features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Z"] <- "Z")
+
+features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown" #Group lettered Barrels together into Barrel "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "B"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "C"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "D"] <- "Unknown"
@@ -499,13 +524,39 @@ features_2017$BarrelA[features_2017$BarrelA == "W"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "X"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "Y"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "Z"] <- "Unknown"
+
+features_2017$BarrelB[features_2017$BarrelB == "A"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "B"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "C"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "D"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "E"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "F"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "G"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "H"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "I"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "J"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "L"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "M"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "N"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "Q"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "R"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "S"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "U"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "V"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "W"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "X"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "Y"] <- "Unknown"
+features_2017$BarrelB[features_2017$BarrelB == "Z"] <- "Unknown"
+
+
+
       
 features_2017 <- features_2017 %>% 
   mutate(Bullet1 = paste(Set, BarrelB, BulletB, LandB, sep = "-"),
-         Bullet2 = paste(Set, BarrelA, BulletA, LandA, sep = "-"))
+         Bullet2 = paste(Set, BarrelA, BulletA, LandA, sep = "-")) # Creating ID similar to Heike's 
 
 
-features_2017 <- features_2017[order(features_2017$Set), ]
+features_2017 <- features_2017[order(features_2017$Set), ] #Ordered Set column so that all 173 observations came before 252 observations
 
 #At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
 
@@ -534,62 +585,52 @@ table(features_2017$LandA)
 
 #----------------------------------------------------------------#
 
+#table(features_2017$compare_id)
+#table(features_2017$profile1_id)
+#table(features_2017$profile2_id)
 ```
-
 
 ```{r}
-Feature_Comparisons <- inner_join(comparisons, features_2017)
+library(viridis)
+features_2017 %>% 
+  filter(!is.na(BarrelA)) %>% 
+    filter(!is.na(BarrelB)) %>% 
+      group_by(BarrelA, BarrelB, Set) %>% 
+        summarise(count = n()) %>% 
+  ggplot(aes(x = BarrelA, y = BarrelB))+
+    geom_tile(aes(fill = count))+
+      scale_fill_viridis(option = "plasma", direction = -1)+ 
+        geom_text(aes(label = count))+ 
+          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+            theme_bw()+ 
+              facet_grid(~Set) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format
 
-Feature_Comparisons %>% 
-  ggplot(aes(x = ccf, y = ccf2))+
-    geom_point()
 
-Feature_Comparisons %>% 
-  ggplot(aes(x = rough_cor, y = rough_cor2))+
-    geom_point()
+features_2017 %>% 
+  filter(Set == "Hamby173") %>%
+      group_by(profile1_id, Bullet1) %>% 
+        summarise(count = n()) %>% 
+  ggplot(aes(x = profile1_id, y = Bullet1))+
+    geom_tile(aes(fill = count))+
+      scale_fill_viridis(option = "plasma", direction = -1)+ 
+          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+            theme_bw()+
+              theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration. 
 
-Feature_Comparisons %>% 
-  ggplot(aes(x = lag, y = lag2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = D, y = D2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = sd_D, y = sd_D2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = signature_length, y = signature_length2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = overlap, y = overlap2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = matches, y = matches2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = mismatches, y = mismatches2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = cms, y = cms2x))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = non_cms, y = non_cms2))+
-    geom_point()
-
-Feature_Comparisons %>% 
-  ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-    geom_point()
-
+features_2017 %>% 
+  filter(Set == "Hamby252") %>%
+      group_by(profile1_id, Bullet1) %>% 
+        summarise(count = n()) %>% 
+  ggplot(aes(x = profile1_id, y = Bullet1))+
+    geom_tile(aes(fill = count))+
+      scale_fill_viridis(option = "plasma", direction = -1)+ 
+          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+            theme_bw()+
+              theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration
 
 ```
+
+#Everything past this point in for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
 
 
 
