@@ -592,6 +592,20 @@ table(features_2017$LandA)
 
 ```{r}
 library(viridis)
+
+comparisons %>% 
+  filter(!is.na(BarrelA)) %>% 
+    filter(!is.na(BarrelB)) %>% 
+      group_by(BarrelA, BarrelB, Set) %>% 
+        summarise(count = n()) %>% 
+  ggplot(aes(x = BarrelA, y = BarrelB))+
+    geom_tile(aes(fill = count))+
+      scale_fill_viridis(option = "plasma", direction = -1)+ 
+        geom_text(aes(label = count))+ 
+          ggtitle("Comparison Tiles")+ 
+            theme_bw()+ 
+              facet_grid(~Set) #Good way to compare graphs below.  Shows how bad "features-hamby.csv" really is. 
+
 features_2017 %>% 
   filter(!is.na(BarrelA)) %>% 
     filter(!is.na(BarrelB)) %>% 
@@ -601,7 +615,7 @@ features_2017 %>%
     geom_tile(aes(fill = count))+
       scale_fill_viridis(option = "plasma", direction = -1)+ 
         geom_text(aes(label = count))+ 
-          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+          ggtitle("Feature 2017 Tiles Showing This Terrible Mess!!!")+ 
             theme_bw()+ 
               facet_grid(~Set) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format
 
@@ -613,7 +627,7 @@ features_2017 %>%
   ggplot(aes(x = profile1_id, y = Bullet1))+
     geom_tile(aes(fill = count))+
       scale_fill_viridis(option = "plasma", direction = -1)+ 
-          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+          ggtitle("Features 2017 Profile_Id(Set = 173)")+ 
             theme_bw()+
               theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration. 
 
@@ -624,7 +638,7 @@ features_2017 %>%
   ggplot(aes(x = profile1_id, y = Bullet1))+
     geom_tile(aes(fill = count))+
       scale_fill_viridis(option = "plasma", direction = -1)+ 
-          ggtitle("Comparison Tiles Showing This Terrible Mess!!!")+ 
+          ggtitle("Features 2017 Profile_Id(Set = 252)")+ 
             theme_bw()+
               theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration
 
