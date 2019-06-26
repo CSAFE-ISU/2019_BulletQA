@@ -90,7 +90,6 @@ plot2 = hamby %>%
           ggtitle("Barrel Unknown")
 
 grid.arrange(plot1, plot2)
-
 ```
 
 Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges seem to be roughly the same for each Bullet.  For Barrels 1-10, Bullet 2 seems to have higher values than Bullet 1.  Barrels 6 and 7 have the largest whiskers.  Barrel 1, Bullet 1 has the smallest inter-quartile range and Barrel 9, Bullet 2 has the largest interquartile range.  There is one apparent outlier for Barrel 10, Bullet 1.  This CrossSection Value is not high enough for concern when looking at all Barrels but should be examined separately.
@@ -148,8 +147,6 @@ crosscuts %>% filter(id == "Hamby252-Unknown-B-2") %>%
     geom_line()+
       facet_grid(Bullet~Land + Set, labeller = "label_both")+
         theme_bw() + ggtitle("High CrossSection Bullet B")
-
-
 ```
 
 Looking at the CrossCuts we can see the side profile for a bullets land impression for every barrel in Hamby173 and Hamby252.  For most of the CrossCuts the shoulders can be clearly identified but there are some that can not be "clearly" identified due to possbile tank rash, pitting, or scans that do not meet the standards that forensic analysis require.  I can not say for certain if there are scans that should be excluded.  I used FIX3P to examine the "groove to groove" scans and noticed considerable tank rash on some of the scans.  There was some noticeable pitting as well but I only felt it was a concern when the pitting was concentrated in the center of the "groove to groove" scan.
@@ -329,9 +326,6 @@ hamby <- hamby %>%
 Signatures <- hamby %>% 
   select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
     tidyr::unnest()
-
-head(Signatures, 5)
-
 ```
 
 ```{r}
@@ -356,7 +350,6 @@ Signatures %>%
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line()+
   facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
-
 ```
 Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
 
@@ -372,7 +365,6 @@ comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
          Set2 = str_extract(Bullet2, "Hamby\\d{2,3}")) %>%
   filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
   select(-matches("Set"))
-head(comparisons)
 ```
 
 ```{r}
@@ -394,7 +386,6 @@ comparisons <- comparisons %>%
   mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
 
 saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
-
 ```
 
 # Extracting features
@@ -412,8 +403,6 @@ comparisons <- comparisons %>%
 
 comparisons <- comparisons %>% 
   tidyr::unnest(Legacy_Features) # Extracting feature legacy
-
-head(comparisons)
 ```
 
 
@@ -439,7 +428,6 @@ head(comparisons, 500)
 ```{r}
 
 features_2017 <- read_csv("features-hamby.csv") #Reading in csv
-
 
 features_2017 <- features_2017 %>%
   select(-land1_id, -land2_id) %>% # removing
@@ -479,28 +467,7 @@ features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "X"] <-
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Y"] <- "Y")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Z"] <- "Z")
 
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "A"] <- "A")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "B"] <- "B")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "C"] <- "C")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "D"] <- "D")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "E"] <- "E")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "F"] <- "F")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "G"] <- "G")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "H"] <- "H")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "I"] <- "I")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "J"] <- "J")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "L"] <- "L")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "M"] <- "M")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "N"] <- "N")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Q"] <- "Q")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "R"] <- "R")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "S"] <- "S")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "U"] <- "U")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "V"] <- "V")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "W"] <- "W")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "X"] <- "X")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Y"] <- "Y")
-features_2017 <- within(features_2017, BulletB[BulletB == 1 & BarrelB == "Z"] <- "Z")
+
 
 features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown" #Group lettered Barrels together into Barrel "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "B"] <- "Unknown"
@@ -525,43 +492,13 @@ features_2017$BarrelA[features_2017$BarrelA == "X"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "Y"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "Z"] <- "Unknown"
 
-features_2017$BarrelB[features_2017$BarrelB == "A"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "B"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "C"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "D"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "E"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "F"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "G"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "H"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "I"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "J"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "L"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "M"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "N"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "Q"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "R"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "S"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "U"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "V"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "W"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "X"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "Y"] <- "Unknown"
-features_2017$BarrelB[features_2017$BarrelB == "Z"] <- "Unknown"
-
-
-
-      
 features_2017 <- features_2017 %>% 
   mutate(Bullet1 = paste(Set, BarrelB, BulletB, LandB, sep = "-"),
          Bullet2 = paste(Set, BarrelA, BulletA, LandA, sep = "-")) # Creating ID similar to Heike's 
 
 
 features_2017 <- features_2017[order(features_2017$Set), ] #Ordered Set column so that all 173 observations came before 252 observations
-
-#At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
-
-#table(comparisons$Set)
-#table(features_2017$Set)
+                                                          # At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
 
 features_2017 <- features_2017 %>% 
   mutate(BarrelB = as.character(BarrelB), 
@@ -569,7 +506,6 @@ features_2017 <- features_2017 %>%
          BulletB = as.character(BulletB), 
          LandA = as.character(LandA), 
          LandB = as.character(LandB))
-
 ```
 
 ```{r}
@@ -583,17 +519,21 @@ table(features_2017$BarrelA)
 table(features_2017$BulletA)
 table(features_2017$LandA)
 
+table(features_2017$BulletB)
+
 #----------------------------------------------------------------#
 
 #table(features_2017$compare_id)
 #table(features_2017$profile1_id)
 #table(features_2017$profile2_id)
+length(features_2017$BarrelA)
+length(features_2017$BarrelB)
 ```
 
 ```{r}
 library(viridis)
 
-comparisons %>% 
+comparisons %>%                          #Comparison heatmap for 2019 data
   filter(!is.na(BarrelA)) %>% 
     filter(!is.na(BarrelB)) %>% 
       group_by(BarrelA, BarrelB, Set) %>% 
@@ -606,7 +546,21 @@ comparisons %>%
             theme_bw()+ 
               facet_grid(~Set) #Good way to compare graphs below.  Shows how bad "features-hamby.csv" really is. 
 
-features_2017 %>% 
+comparisons %>% 
+  filter(!is.na(BarrelA)) %>% 
+    filter(!is.na(BarrelB)) %>% 
+      group_by(BarrelA, BarrelB, Set) %>% summarise(count = max(signature_length)) %>% 
+  ggplot(aes(x = BarrelA, y = BarrelB))+
+    geom_tile(aes(fill = count))+
+      scale_fill_viridis(option = "plasma", direction = -1)+ 
+        geom_text(aes(label = count))+ 
+          ggtitle("Comparison Signature_Length Tiles")+ 
+            theme_bw()+
+              facet_grid(~Set)
+
+
+
+features_2017 %>%                        # features_2017 plot 1
   filter(!is.na(BarrelA)) %>% 
     filter(!is.na(BarrelB)) %>% 
       group_by(BarrelA, BarrelB, Set) %>% 
@@ -615,10 +569,38 @@ features_2017 %>%
     geom_tile(aes(fill = count))+
       scale_fill_viridis(option = "plasma", direction = -1)+ 
         geom_text(aes(label = count))+ 
-          ggtitle("Feature 2017 Tiles Showing This Terrible Mess!!!")+ 
-            theme_bw()+ 
-              facet_grid(~Set) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format
+          ggtitle("Comparison Count Version 1")+ 
+            theme_bw()+ theme(axis.text.x = element_text(angle = 10))+
+              facet_grid(~Set) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format.
 
+
+
+features_2017 %>%                       # features_2017 plot 2
+ filter(!is.na(BarrelA)) %>%
+   filter(!is.na(BarrelB)) %>%
+     group_by(BarrelA, BarrelB, Bullet1, Bullet2, Set) %>%
+      arrange(desc(signature_length2)) %>% summarize(count = n()) %>%
+       filter(row_number() == 1) %>% 
+                ungroup() %>% 
+  group_by(BarrelA, BarrelB, Set) %>%
+    summarise(count = n()) %>% 
+      ggplot(aes(x = BarrelA, y = BarrelB))+
+       geom_tile(aes(fill = count))+
+        scale_fill_viridis(option = "plasma", direction = -1)+
+          geom_text(aes(label = count))+
+            ggtitle("Comparison Count Version 2")+
+              theme_bw()+ theme(axis.text.x = element_text(angle = 10))+
+                 facet_grid(~Set)
+```
+
+We shall use the comparison plot from our 2019 data to help compare our data from 2017.
+Looking at features_2017 plot1 we can see that my analysis about duplicate data seems to be correct. 
+Looking at features_2017 plot2 we can see that there is also missing data on the Barrel-Bullet-Land level.
+Both of these visual representations are also written in the word.document 
+
+
+
+```{r}
 
 features_2017 %>% 
   filter(Set == "Hamby173") %>%
@@ -641,10 +623,9 @@ features_2017 %>%
           ggtitle("Features 2017 Profile_Id(Set = 252)")+ 
             theme_bw()+
               theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration
-
 ```
 
-#Everything past this point in for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
+#Everything past this point is for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
 
 
 
