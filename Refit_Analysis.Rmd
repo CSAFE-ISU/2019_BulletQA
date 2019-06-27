@@ -467,8 +467,6 @@ features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "X"] <-
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Y"] <- "Y")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Z"] <- "Z")
 
-
-
 features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown" #Group lettered Barrels together into Barrel "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "B"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "C"] <- "Unknown"
@@ -518,16 +516,6 @@ table(comparisons$LandA)
 table(features_2017$BarrelA)
 table(features_2017$BulletA)
 table(features_2017$LandA)
-
-table(features_2017$BulletB)
-
-#----------------------------------------------------------------#
-
-#table(features_2017$compare_id)
-#table(features_2017$profile1_id)
-#table(features_2017$profile2_id)
-length(features_2017$BarrelA)
-length(features_2017$BarrelB)
 ```
 
 ```{r}
@@ -579,7 +567,7 @@ features_2017 %>%                       # features_2017 plot 2
  filter(!is.na(BarrelA)) %>%
    filter(!is.na(BarrelB)) %>%
      group_by(BarrelA, BarrelB, Bullet1, Bullet2, Set) %>%
-      arrange(desc(signature_length2)) %>% summarize(count = n()) %>%
+      arrange(desc(signature_length2)) %>% 
        filter(row_number() == 1) %>% 
                 ungroup() %>% 
   group_by(BarrelA, BarrelB, Set) %>%
@@ -601,34 +589,35 @@ Both of these visual representations are also written in the word.document
 
 
 ```{r}
+# Let's try to find those missing values with an easy way
+# Inspiration came from Susan and 
+#https://www.r-bloggers.com/r-sorting-a-data-frame-by-the-contents-of-a-column/
+#https://www.rdocumentation.org/packages/base/versions/3.6.0/topics/t 
 
-features_2017 %>% 
-  filter(Set == "Hamby173") %>%
-      group_by(profile1_id, Bullet1) %>% 
-        summarise(count = n()) %>% 
-  ggplot(aes(x = profile1_id, y = Bullet1))+
-    geom_tile(aes(fill = count))+
-      scale_fill_viridis(option = "plasma", direction = -1)+ 
-          ggtitle("Features 2017 Profile_Id(Set = 173)")+ 
-            theme_bw()+
-              theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration. 
+comparisons_check <- comparisons %>% 
+  select(Bullet1, Bullet2) #Remove Columns we wont be using
 
-features_2017 %>% 
-  filter(Set == "Hamby252") %>%
-      group_by(profile1_id, Bullet1) %>% 
-        summarise(count = n()) %>% 
-  ggplot(aes(x = profile1_id, y = Bullet1))+
-    geom_tile(aes(fill = count))+
-      scale_fill_viridis(option = "plasma", direction = -1)+ 
-          ggtitle("Features 2017 Profile_Id(Set = 252)")+ 
-            theme_bw()+
-              theme(axis.text.y = element_text(size= 9, angle=20)) #Just for exploration
+features_2017_check <- features_2017 %>% 
+  select(Bullet1, Bullet2) # Remove Columns we wont be using
+
+finder <- t(apply(comparisons_check,1,sort))
+finder <- data.frame(finder)
+
+#Take Transpose and Sort in order... Now we have:
+#AB   => AB
+#BA   => AB
+
+finder <- finder[!duplicated(finder),] # Remove duplicates 
+
+finder <- finder %>% 
+  rename(Bullet2 = X2, Bullet1 = X1) %>% 
+    select(Bullet1, Bullet2) 
+      
+finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what data is missing and if you add Bullet1 to the anti_join you can see all thee missing Unknown|Unknown Comparisons 
 ```
 
+
 #Everything past this point is for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
-
-
-
 
 ```{r eval=FALSE, include=FALSE}
 comparisons %>% select(ccf, cms, non_cms, matches, mismatches, D, sum_peaks) %>% summary()
