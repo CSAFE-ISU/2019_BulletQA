@@ -626,68 +626,88 @@ comparison_split <- comparisons %>%                                             
  
 
 
-feature_id1 <- features_2017[!duplicated(features_2017[c("Bullet1","Bullet2")]),]
-feature_id2 <- anti_join(features_2017, feature_id1)
+feature_id1 <- features_2017[!duplicated(features_2017[c("Bullet1","Bullet2")]),] #profile1
+feature_id2 <- anti_join(features_2017, feature_id1)                              #profile2
 
 feature_id1 <- na.omit(feature_id1)
 feature_id2 <- na.omit(feature_id2)
 
 scatter1 <- inner_join(comparison_split, feature_id1, by = c("Bullet1", "Bullet2"))
 scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2"))
-
 ```
 
 ```{r}
 
 scatter1 %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ccf Vs ccf2")
 
 scatter2 %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+        
+        ggtitle("ScatterPlot2 ccf Vs ccf2")
 
 scatter1 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("rough_cor Vs rough_cor2")
 
 scatter2 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ScatterPlot2 rough_cor Vs rough_cor2")
 
 scatter1 %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("cms Vs cms2")
 
 scatter2 %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ScatterPlot2 cms Vs cms2")
 
 scatter1 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("sum_peaks Vs sum_peaks2")
+        
 
 scatter2 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ScatterPlot2 sum_peaks Vs sum_peaks2")
 
 scatter1 %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("signature_length Vs signature_length2")
 
 scatter2 %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_point()+
+  geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ScatterPlot2 signature_length Vs signature_length2")
 ```
 
 ```{r}
@@ -701,7 +721,7 @@ scatterA %>%
     ggplot(aes(x = ccf, y = value))+
       geom_point()+
       geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
            theme_bw()+
             ggtitle("ccf VS other features")
@@ -711,7 +731,7 @@ scatterB %>%
     ggplot(aes(x = ccf2, y = value))+
       geom_point()+
       geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"))+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         facet_wrap(~measure, ncol = 4, scale = "free")+
           theme_bw()+
             ggtitle("ccf2 VS other features")
@@ -721,7 +741,7 @@ scatterB %>%
     #ggplot(aes(x = cms, y = value))+
       #geom_point()+
       #geom_smooth(method = lm)+
-      #geom_smooth(aes(colour = "red"))+
+      #geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         #facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
            #theme_bw()+ 
             #ggtitle("cms VS other features")
@@ -729,7 +749,7 @@ scatterB %>%
     #ggplot(aes(x = cms2x, y = value))+
       #geom_point()+
       #geom_smooth(method = lm)+
-      #geom_smooth(aes(colour = "red"))+
+      #geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         #facet_wrap(~measure, ncol = 4, scale = "free")+
          #theme_bw()+
             #ggtitle("cms2x VS other features")
