@@ -617,6 +617,7 @@ finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what
 ```
 
 ```{r}
+#Better version of above method I think, using dplyr
 comparison_split <- comparisons %>%                                                    #Assign Comparisons
   rowwise() %>%                                                                        #Every Row
     mutate(sorter = paste(sort(c(Bullet1, Bullet2)), collapse="-")) %>%                # create col "sorter", which pastes both cols and sorts in order
@@ -639,34 +640,54 @@ scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2
 ```{r}
 
 scatter1 %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter2 %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter1 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter2 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter1 %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter2 %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter1 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter2 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter1 %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 
 scatter2 %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_point()
+  geom_point()+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))
 ```
 
 ```{r}
@@ -679,7 +700,9 @@ scatterB <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "
 scatterA %>% 
     ggplot(aes(x = ccf, y = value))+
       geom_point()+
-        facet_wrap(~measure, ncol = 4, scale = "free")+
+      geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))+
+        facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
            theme_bw()+
             ggtitle("ccf VS other features")
 
@@ -687,13 +710,43 @@ scatterA %>%
 scatterB %>% 
     ggplot(aes(x = ccf2, y = value))+
       geom_point()+
+      geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"))+
         facet_wrap(~measure, ncol = 4, scale = "free")+
           theme_bw()+
             ggtitle("ccf2 VS other features")
 
+
+#scatterA %>% 
+    #ggplot(aes(x = cms, y = value))+
+      #geom_point()+
+      #geom_smooth(method = lm)+
+      #geom_smooth(aes(colour = "red"))+
+        #facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
+           #theme_bw()+ 
+            #ggtitle("cms VS other features")
+#scatterB %>% 
+    #ggplot(aes(x = cms2x, y = value))+
+      #geom_point()+
+      #geom_smooth(method = lm)+
+      #geom_smooth(aes(colour = "red"))+
+        #facet_wrap(~measure, ncol = 4, scale = "free")+
+         #theme_bw()+
+            #ggtitle("cms2x VS other features")
+
+#---------------------------------------------------------------------------------------#
+#CHECK 
 ```
 
-#Everything past this point is for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
+
+### Looking at the normal/facet_grid scatterplots we can make some observations but before that, let me got over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no linear relationship between x and y. For the graphs where ccf, ccf2, cms, and cms2 are compared to the other features, we also see no linear relationships between x and y. The scatterplots look like huge clouds.
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------#
+#Everything past this point is for comparison data.  There is still issues to be solved before Joining both data frames together.#
 
 ```{r eval=FALSE, include=FALSE}
 comparisons %>% select(ccf, cms, non_cms, matches, mismatches, D, sum_peaks) %>% summary()
