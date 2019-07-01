@@ -605,7 +605,7 @@ finder <- data.frame(finder)
 
 #Take Transpose and Sort in order... Now we have:
 #AB   => AB
-#BA   => AB
+#BA   => AB 
 
 finder <- finder[!duplicated(finder),] # Remove duplicates 
 
@@ -616,6 +616,82 @@ finder <- finder %>%
 finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what data is missing and if you add Bullet1 to the anti_join you can see all thee missing Unknown|Unknown Comparisons 
 ```
 
+```{r}
+comparison_split <- comparisons %>%                                                    #Assign Comparisons
+  rowwise() %>%                                                                        #Every Row
+    mutate(sorter = paste(sort(c(Bullet1, Bullet2)), collapse="-")) %>%                # create col "sorter", which pastes both cols and sorts in order
+      distinct(sorter, .keep_all=T) %>%                                                # remove all rows with duplicate values in sorter
+        select(-sorter)                                                                # no need for column 
+ 
+
+
+feature_id1 <- features_2017[!duplicated(features_2017[c("Bullet1","Bullet2")]),]
+feature_id2 <- anti_join(features_2017, feature_id1)
+
+feature_id1 <- na.omit(feature_id1)
+feature_id2 <- na.omit(feature_id2)
+
+scatter1 <- inner_join(comparison_split, feature_id1, by = c("Bullet1", "Bullet2"))
+scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2"))
+
+```
+
+```{r}
+
+scatter1 %>% ggplot(aes(x = ccf, y = ccf2))+
+  geom_point()
+
+scatter2 %>% ggplot(aes(x = ccf, y = ccf2))+
+  geom_point()
+
+scatter1 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
+  geom_point()
+
+scatter2 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
+  geom_point()
+
+scatter1 %>% ggplot(aes(x = cms, y = cms2x))+
+  geom_point()
+
+scatter2 %>% ggplot(aes(x = cms, y = cms2x))+
+  geom_point()
+
+scatter1 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
+  geom_point()
+
+scatter2 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
+  geom_point()
+
+scatter1 %>% ggplot(aes(x = signature_length, y = signature_length2))+
+  geom_point()
+
+scatter2 %>% ggplot(aes(x = signature_length, y = signature_length2))+
+  geom_point()
+```
+
+```{r}
+
+scatterA <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf2", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
+
+scatterB <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
+
+
+scatterA %>% 
+    ggplot(aes(x = ccf, y = value))+
+      geom_point()+
+        facet_wrap(~measure, ncol = 4, scale = "free")+
+           theme_bw()+
+            ggtitle("ccf VS other features")
+
+
+scatterB %>% 
+    ggplot(aes(x = ccf2, y = value))+
+      geom_point()+
+        facet_wrap(~measure, ncol = 4, scale = "free")+
+          theme_bw()+
+            ggtitle("ccf2 VS other features")
+
+```
 
 #Everything past this point is for comparison data separatley.  There is still issues to be solved before Joining both data frames together.#
 
