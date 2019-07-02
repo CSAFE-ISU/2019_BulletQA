@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Refit Analysis"
 author: "Andrew Maloney"
 date: "6/7/2019"
 output: html_document
@@ -27,9 +27,10 @@ library(gridExtra)
 library(tidyr)
 options(future.globals.maxSize = 4*1024*1024*1024)
 #data_dir <- "/media/Raven/REU_Refit"
+load("Analysis_Data.RData") #Load for all results faster
 ```
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 # Reading in Hamby_173
 df <- tibble(path = list.files(path = "Hamby_173", 
                                pattern = ".x3p", recursive = T, 
@@ -68,7 +69,7 @@ rm(df, df2)
 ```
 
 # Cross Sections look good.
-```{r}
+```{r eval=FALSE, include=TRUE}
 plan(multicore) # use all the cores at once
 hamby <- hamby %>%
   mutate(
@@ -97,7 +98,7 @@ Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges se
 Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
 
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 #Cross Sections
 hamby <- hamby %>% 
   mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
@@ -109,9 +110,9 @@ crosscuts %>%
   arrange(desc(CrossSection))
 ```
 
-#### For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
+Note: For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
 
-#### For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
+Note: For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
 
 ```{r}
 #Looking at CrossCuts to see any issues
@@ -154,10 +155,10 @@ Looking at the CrossCuts we can see the side profile for a bullets land impressi
 When looking at the Crosscuts we can see most have noticeable curvature.  There are some scans that do not and these scans can look like a flat line or even a traingle... I Have made note of these particular scans as well.  
 
 
-# Groved Data taken from github
-```{r}
+# Groove Loader
+```{r eval=FALSE, include=TRUE}
 #Grooves
-saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
+saved_grooves_location <- "Andrew_hand_V2H173_H252_Grooves_data.rda"
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
 } else {
@@ -235,8 +236,9 @@ rm(Hamby_test, Hamby_test2, Hamby_test3, Hamby_test4, Hamby_test5, Hamby_test6, 
 
 
 # When run in interactive mode, a shiny app can be used to set smarter grooves.
-# Grooves taken from github. Played around with shiny but did not use.
-```{r get-grooves-interactive, echo = FALSE}
+# Groove Identifications by: Andrew Maloney
+# Using Shiny App
+```{r get-grooves-interactive, eval=FALSE, include=TRUE}
 library(shiny)
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
@@ -318,7 +320,7 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 #Test Some Grooves(performed:06/12/19)
 ```
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 #Signatures
 hamby <- hamby %>% 
   mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
@@ -351,13 +353,16 @@ ggplot(data = ., aes(x = x, y = sig, color = Land)) +
   geom_line()+
   facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
 ```
+
 Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
 
 There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
 
 We also examine the number of consecutively matching peaks in signatures for two aligned lands.(Case Validation Paper)
 
-```{r}
+Groove Identifications Approved
+
+```{r eval=FALSE, include=TRUE}
 comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
   left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
   left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
@@ -367,7 +372,7 @@ comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
   select(-matches("Set"))
 ```
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 #plan(multicore(workers = availableCores(constraints = 8)))
 
 get_sig <- function(data) {
@@ -389,7 +394,7 @@ saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252
 ```
 
 # Extracting features
-```{r}
+```{r eval=FALSE, include=TRUE}
 comparisons <- comparisons %>% 
   select(-Bullet1_data, -Bullet2_data)
 
@@ -425,6 +430,7 @@ comparisons <- comparisons %>%
 head(comparisons, 500)
 ```
 
+# Features 2017 Data
 ```{r}
 
 features_2017 <- read_csv("features-hamby.csv") #Reading in csv
@@ -467,6 +473,8 @@ features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "X"] <-
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Y"] <- "Y")
 features_2017 <- within(features_2017, BulletA[BulletA == 1 & BarrelA == "Z"] <- "Z")
 
+
+
 features_2017$BarrelA[features_2017$BarrelA == "A"] <- "Unknown" #Group lettered Barrels together into Barrel "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "B"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "C"] <- "Unknown"
@@ -506,6 +514,7 @@ features_2017 <- features_2017 %>%
          LandB = as.character(LandB))
 ```
 
+# Comparing 2017 and 2019 after basic cleaning
 ```{r}
 table(comparisons$BarrelA)
 table(comparisons$BulletA)
@@ -518,6 +527,7 @@ table(features_2017$BulletA)
 table(features_2017$LandA)
 ```
 
+# Heat Maps
 ```{r}
 library(viridis)
 
@@ -587,7 +597,7 @@ Looking at features_2017 plot2 we can see that there is also missing data on the
 Both of these visual representations are also written in the word.document 
 
 
-
+# Finding Missing Values 
 ```{r}
 # Let's try to find those missing values with an easy way
 # Inspiration came from Susan and 
@@ -616,6 +626,8 @@ finder <- finder %>%
 finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what data is missing and if you add Bullet1 to the anti_join you can see all thee missing Unknown|Unknown Comparisons 
 ```
 
+
+# Creating Data Frames for feature comparisons
 ```{r}
 #Better version of above method I think, using dplyr
 comparison_split <- comparisons %>%                                                    #Assign Comparisons
@@ -629,13 +641,14 @@ comparison_split <- comparisons %>%                                             
 feature_id1 <- features_2017[!duplicated(features_2017[c("Bullet1","Bullet2")]),] #profile1
 feature_id2 <- anti_join(features_2017, feature_id1)                              #profile2
 
-feature_id1 <- na.omit(feature_id1)
-feature_id2 <- na.omit(feature_id2)
+feature_id1 <- na.omit(feature_id1) # Remove Na
+feature_id2 <- na.omit(feature_id2) # Remove Na
 
-scatter1 <- inner_join(comparison_split, feature_id1, by = c("Bullet1", "Bullet2"))
-scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2"))
+scatter1 <- inner_join(comparison_split, feature_id1, by = c("Bullet1", "Bullet2")) #ScatterPlot Comparisons for profile_id version 1
+scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2")) # ScatterPlot Comparisons for Profile_id version 2
 ```
 
+# ScatterPlots
 ```{r}
 
 scatter1 %>% ggplot(aes(x = ccf, y = ccf2))+
@@ -708,10 +721,24 @@ scatter2 %>% ggplot(aes(x = signature_length, y = signature_length2))+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("ScatterPlot2 signature_length Vs signature_length2")
+
+scatter1 %>% ggplot(aes(x = D, y = D2))+
+  geom_bin2d(bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("Distance Vs Distance2")
+
+scatter2 %>% ggplot(aes(x = D, y = D2))+
+  geom_bin2d(bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("ScatterPlot2 Distance Vs Distance2")
 ```
 
+# Scatter Plots
 ```{r}
-
 scatterA <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf2", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
 
 scatterB <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
@@ -742,7 +769,7 @@ scatterB %>%
       #geom_point()+
       #geom_smooth(method = lm)+
       #geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        #facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
+        #facet_wrap(~measure, ncol = 4, scale = "free")+
            #theme_bw()+ 
             #ggtitle("cms VS other features")
 #scatterB %>% 
@@ -759,153 +786,11 @@ scatterB %>%
 ```
 
 
-### Looking at the normal/facet_grid scatterplots we can make some observations but before that, let me got over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no linear relationship between x and y. For the graphs where ccf, ccf2, cms, and cms2 are compared to the other features, we also see no linear relationships between x and y. The scatterplots look like huge clouds.
+Looking at the normal/facet_grid scatterplots we can make some observations but before that, let me go over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no linear relationship between x and y. For the graphs where ccf, ccf2, cms, and cms2 are compared to the other features, we also see no linear relationships between x and y. The scatterplots look like huge clouds.
 
 
 
 
-
-#-------------------------------------------------------------------------------------------------------------------------------------------#
-#Everything past this point is for comparison data.  There is still issues to be solved before Joining both data frames together.#
-
-```{r eval=FALSE, include=FALSE}
-comparisons %>% select(ccf, cms, non_cms, matches, mismatches, D, sum_peaks) %>% summary()
-
-comparisons <- comparisons %>% 
-  mutate(KM_KNM = if_else(ccf >= 0.75, "Known_Match", "Known_non_Match")) %>% 
-    mutate(KM_KNM = factor(KM_KNM))
-
-HambyDataLong <- gather(comparisons, key="measure", value="value", c("ccf", "cms", "non_cms", "matches", "mismatches", "D", "sum_peaks"))
-
-HambyDataLong %>% 
-    ggplot(aes(value, fill = KM_KNM))+
-      geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure, ncol = 4, scale = "free")+
-          scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features")
-
-HambyDataLong %>% 
-    ggplot(aes(value, fill = KM_KNM))+
-      geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure + Set, ncol = 4, scale = "free")+
-          scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features")
-
-head(HambyDataLong)
-
-rm(HambyDataLong) # File size is large, just for  convenience sake.
-rm(lines)
-```
-
-
-Looking at the summary statistics for some of the features extracted we can see important observations. The ccf has a minimum value of .0489, a mean of .3577, and a Maximum value of 1.  For Consecutively Matching Striae we see a minumum value of 0, a mean of 1.049, and a Maximum of 15.9357.  For non Consecutively Matching Striae we see a minimum value of 0, a mean of 6.135, and a maximum of 20.408. For # matches we have a minimum value of 0, a mean of 1.611, and a maximum of 15.9357. For # mismatches we have a minimum value of 0, a mean of 10.390, and a maximum of 20.408.  For average Distance (D) we have a minimum value of 0, a mean of .003341, and a maximum value of .02. For sum_peaks we have a minimum value of 0, a mean of 2.921, and a maximum of 44.036. 
-
-We now create a density plot.  First we had to define a "Known Match" and a "Known non Match."  Standard procedure for a "Known" match/nonmatch is if the ccf is greater than or equal to .50, then it is a Known match.  If the ccf is less than .50, it is a known nonmatch.  From the Density plot, the first things that strike concerns are the scaling of the x and y axes.  The second thing to notice is that seperation in the density plots only starts to occur when the ccf condition for a Known match/nonmatch increases from .50 to around .70 and up.  I also plotted the Density Plots by "Set" but separation did not occur until ccf condition was increased to .70's. 
-
-```{r eval=FALSE, include=FALSE}
-comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
-head(comparisons, 500)
-
-Bullet_Scores <- comparisons %>% 
-  group_by(BulletA, BulletB) %>% 
-    tidyr::nest()
-
-Bullet_Scores <- Bullet_Scores %>% 
-  mutate(Bullet_Score = data %>% 
-          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
-
-Bullet_Scores %>% select(-data) %>% arrange(desc(Bullet_Score))
-
-Bullet_Scores <- Bullet_Scores %>% 
-  mutate(data = data %>% future_map(.f = function(d){
-  d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
-  d
-}))
-
-Bullet_Scores %>% tidyr::unnest(data) 
-```
-
-```{r eval=FALSE, include=FALSE}
-
-Bullet_Scores_Examin <- Bullet_Scores %>% tidyr::unnest(data)
-
-Bullet_Scores_Examin %>% filter(samepath == "TRUE")
-
-
-Bullet_Scores_Examin %>% filter(samepath == "FALSE")
-```
-
-
-Looking at whether two lands have the same source
-samepath = 324 TRUEs
-samepath = 87,876 FALSEs 
-
-Looking at the variable "samepath" or in demo "samesource" we see that only Barrel "Unknown" bullets from both Hamby173 and Hamby252 are said to be from same source.  
-
-
-# Comparing rfscores
-```{r eval=FALSE, include=FALSE}
-library(gridExtra)
-head(comparisons, 500)
-
-plot1 = comparisons %>%
-  filter(BarrelA == 2 & BarrelB == 2) %>% 
-    filter(BulletA == 1 & BulletB == 1 ) %>% 
-      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
-        geom_tile()+ 
-          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
-            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source and Same Bullet")+ facet_grid(~Set)
-
-plot2 = comparisons %>%
-  filter(BarrelA == 2 & BarrelB == 2) %>% 
-    filter(BulletA == 1 & BulletB == 2 ) %>% 
-      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
-        geom_tile()+ 
-          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
-            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
-            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ 
-              ggtitle("Same Source but Different Bullet") + facet_grid(~Set)
-
-
-plot3 = comparisons %>% 
-  filter(BarrelA == 10 & BarrelB == 5) %>% 
-    filter(BulletA == 1 & BulletB == 2 ) %>% 
-      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
-        geom_tile()+ 
-          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
-            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
-            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ 
-              ggtitle("Different Source") + facet_grid(~Set)
-
-grid.arrange(plot1, plot2, plot3, ncol = 2)
-
-```
-
-Looking at the land-land matching scores for bullets 1 and 2. We plotted an example when the bullets came from the same barrel and when the bullets came from different barrels. The matrix shown for bullets 1 and 2 that came from the same barrel look promising but rfscores seem lower than expected.
-
-
-
-#Statistical Summary Comparions between bulletxtrctr demo and Refit_Analysis
-
-```{r eval=FALSE, include=FALSE}
-comparisons %>% 
-  select(ccf, rough_cor, D, signature_length, matches, mismatches, cms, non_cms, sum_peaks, rfscore) %>% 
-    summary()
-
-```
-
-
-I wanted to see how the summary statistics for certain features compared with the bulletxtrctr demo and Refit_Analysis.  The results were pretty similar even though the data for Refit_Analysis is much bigger than the bulletxtrctr demo.  There were some noticeable difference though:
-  
-The Max Distance for Refit_Analysis was .02, while the max distance for bulletxtrctr demo was .005
-
-Matches and Mismatches varied a little for both but showed very similar outputs.
-
-For Bulletxtrctr demo the cms had a mean of 1.6845 and a max of 9.5188.  The non_cms had a mean of 3.531 and a max of 8.457.
-For Refit_Analysis the cms had a mean of 1.0509 and a max of 15.9357.  The non_cms had a mean of 6.144 and a max of 20.408. 
-
-The mean rfscore for bulletxtrctr demo was 0.189329.
-The mean rfscore for Refit_Analysis was 0.093215.  
 
 
 
