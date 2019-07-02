@@ -27,10 +27,10 @@ library(gridExtra)
 library(tidyr)
 options(future.globals.maxSize = 4*1024*1024*1024)
 #data_dir <- "/media/Raven/REU_Refit"
-load("Analysis_Data.RData") #Load for all results faster
+
 ```
 
-```{r eval=FALSE, include=TRUE}
+```{r}
 # Reading in Hamby_173
 df <- tibble(path = list.files(path = "Hamby_173", 
                                pattern = ".x3p", recursive = T, 
@@ -69,7 +69,7 @@ rm(df, df2)
 ```
 
 # Cross Sections look good.
-```{r eval=FALSE, include=TRUE}
+```{r}
 plan(multicore) # use all the cores at once
 hamby <- hamby %>%
   mutate(
@@ -98,7 +98,7 @@ Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges se
 Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
 
 
-```{r eval=FALSE, include=TRUE}
+```{r}
 #Cross Sections
 hamby <- hamby %>% 
   mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
@@ -156,9 +156,9 @@ When looking at the Crosscuts we can see most have noticeable curvature.  There 
 
 
 # Groove Loader
-```{r eval=FALSE, include=TRUE}
+```{r}
 #Grooves
-saved_grooves_location <- "Andrew_hand_V2H173_H252_Grooves_data.rda"
+saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
 } else {
@@ -181,7 +181,6 @@ plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 
 # Examining Groove Cut Offs
 ```{r}
-
 Hamby_test <- hamby %>% 
   filter(Set == "Hamby252") %>% 
     filter(Barrel == 6)
@@ -320,7 +319,7 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 #Test Some Grooves(performed:06/12/19)
 ```
 
-```{r eval=FALSE, include=TRUE}
+```{r}
 #Signatures
 hamby <- hamby %>% 
   mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
@@ -352,6 +351,8 @@ Signatures %>%
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line()+
   facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
+
+load("Data_NeededV3.RData")  #Load for all results faster
 ```
 
 Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
