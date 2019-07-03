@@ -28,9 +28,10 @@ library(tidyr)
 options(future.globals.maxSize = 4*1024*1024*1024)
 #data_dir <- "/media/Raven/REU_Refit"
 
+
 ```
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 # Reading in Hamby_173
 df <- tibble(path = list.files(path = "Hamby_173", 
                                pattern = ".x3p", recursive = T, 
@@ -42,9 +43,9 @@ df <- tibble(path = list.files(path = "Hamby_173",
          Land = str_extract(path, "land\\d{1}") %>% 
            str_remove("land")) %>% 
   mutate(Set = "Hamby173") %>%
-  mutate(x3p = future_map(path, read_x3p)) %>%
+  mutate(x3p = map(path, read_x3p)) %>%
  
-  mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
+  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
 
 # Reading in Hamby_252
 df2 <- tibble(path = list.files(path = "Hamby_252", 
@@ -57,9 +58,9 @@ df2 <- tibble(path = list.files(path = "Hamby_252",
          Land = str_extract(path, "Bullet [12A-Z]-[123456]") %>% 
            str_remove("Bullet [12A-Z]-")) %>% 
   mutate(Set = "Hamby252") %>%
-  mutate(x3p = future_map(path,read_x3p))  %>%
+  mutate(x3p = map(path,read_x3p))  %>%
   # Adjust orientation
-  mutate(x3p = future_map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
+  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
 # One big data set - easier to debug the code if you do everything in one big go.
 hamby <- bind_rows(df, df2) 
 hamby <- hamby %>%
@@ -69,11 +70,11 @@ rm(df, df2)
 ```
 
 # Cross Sections look good.
-```{r}
+```{r eval=FALSE, include=TRUE}
 plan(multicore) # use all the cores at once
 hamby <- hamby %>%
   mutate(
-    CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25))
+    CrossSection = map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25))
 
 head(select(hamby, -path, -x3p), 5)
 #hamby %>% arrange(desc(CrossSection))
@@ -98,10 +99,10 @@ Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges se
 Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
 
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 #Cross Sections
 hamby <- hamby %>% 
-  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+  mutate(CrossCut = map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
 
 crosscuts <- select(hamby, -path, -x3p) %>% 
       tidyr::unnest(CrossCut)
@@ -156,7 +157,7 @@ When looking at the Crosscuts we can see most have noticeable curvature.  There 
 
 
 # Groove Loader
-```{r}
+```{r eval=FALSE, include=TRUE}
 #Grooves
 saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
 if (file.exists(saved_grooves_location)) {
@@ -164,7 +165,7 @@ if (file.exists(saved_grooves_location)) {
 } else {
   hamby <- hamby %>% 
     mutate(Grooves = CrossCut %>% 
-             future_map(.f = cc_locate_grooves, 
+             map(.f = cc_locate_grooves, 
                         method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
 }
 
@@ -173,14 +174,11 @@ grooves <- hamby %>% tidyr::unnest(Grooves)
 head(grooves, 10)
 
 head(select(hamby, -path, -x3p, -CrossCut), 5)
-
-
-plan(sequential) # stop furrr multicore processes - messes with shiny/rmd
 ```
 
 
 # Examining Groove Cut Offs
-```{r}
+```{r eval=FALSE, include=TRUE}
 Hamby_test <- hamby %>% 
   filter(Set == "Hamby252") %>% 
     filter(Barrel == 6)
@@ -319,10 +317,10 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 #Test Some Grooves(performed:06/12/19)
 ```
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 #Signatures
 hamby <- hamby %>% 
-  mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
+  mutate(Signatures = map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
 
 Signatures <- hamby %>% 
   select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
@@ -352,7 +350,6 @@ ggplot(data = ., aes(x = x, y = sig, color = Land)) +
   geom_line()+
   facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
 
-load("Data_NeededV3.RData")  #Load for all results faster
 ```
 
 Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
@@ -363,7 +360,7 @@ We also examine the number of consecutively matching peaks in signatures for two
 
 Groove Identifications Approved
 
-```{r eval=FALSE, include=TRUE}
+```{r eval=FALSE, warning=FALSE, include=TRUE}
 comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
   left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
   left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
@@ -377,19 +374,19 @@ comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
 #plan(multicore(workers = availableCores(constraints = 8)))
 
 get_sig <- function(data) {
-  purrr::map(data$Signatures, "sig")
+  map(data$Signatures, "sig")
 }
 comparisons <- comparisons %>%
-  mutate(sig1 = purrr::map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
+  mutate(sig1 = map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
 
 plan(multicore)
 
 comparisons <- comparisons %>%
-  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+  mutate(Aligned = map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
 
 # Get striae
 comparisons <- comparisons %>%
-  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
+  mutate(Striae = map(Aligned, sig_cms_max)) # Obtaining Striae
 
 saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
 ```
@@ -399,13 +396,11 @@ saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252
 comparisons <- comparisons %>% 
   select(-Bullet1_data, -Bullet2_data)
 
-plan(multicore(workers = availableCores(constraints = 8))) # Core Restraint so server does not die 
+comparisons <- comparisons %>% 
+  mutate(features = map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625)) #ObtainingFeatures
 
 comparisons <- comparisons %>% 
-  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625)) #ObtainingFeatures
-
-comparisons <- comparisons %>% 
-  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+  mutate(Legacy_Features = map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
 
 comparisons <- comparisons %>% 
   tidyr::unnest(Legacy_Features) # Extracting feature legacy
@@ -438,13 +433,13 @@ features_2017 <- read_csv("features-hamby.csv") #Reading in csv
 
 features_2017 <- features_2017 %>%
   select(-land1_id, -land2_id) %>% # removing
-    filter(study1 != "Cary" & study2 != "Cary") %>% # removing
+    filter(study1 != "Cary" & study2 != "Cary") %>%
+        filter(study1 == study2) %>%
+          select(-study2) %>%
       rename(BarrelB = barrel1, BulletB = bullet1, LandB = land1) %>% # Changed column names
       rename(BarrelA = barrel2, BulletA = bullet2, LandA = land2) %>% # Changed column names
-        select(-study1) %>%
-      rename(Set = study2) %>%
-          mutate(Set = gsub("Hamby44", "Hamby173", Set)) %>% #Chnaging observation name
-            mutate(Set = factor(Set, levels = c("Hamby173", "Hamby252"))) %>% # for ordering principles
+          mutate(study1 = gsub("Hamby44", "Hamby173", study1)) %>% #Chnaging observation name
+            mutate(study1 = factor(study1, levels = c("Hamby173", "Hamby252"))) %>% # for ordering principles
       rename(ccf2 = ccf, rough_cor2 = rough_cor, lag2 = lag, D2 = D, sd_D2 = sd_D, signature_length2 = signature_length, overlap2 = overlap, matches2 = matches, mismatches2 = mismatches, cms2x = cms, non_cms2 = non_cms, sum_peaks2 = sum_peaks) # Column names changed for comparing purposes 
 
 
@@ -500,12 +495,12 @@ features_2017$BarrelA[features_2017$BarrelA == "Y"] <- "Unknown"
 features_2017$BarrelA[features_2017$BarrelA == "Z"] <- "Unknown"
 
 features_2017 <- features_2017 %>% 
-  mutate(Bullet1 = paste(Set, BarrelB, BulletB, LandB, sep = "-"),
-         Bullet2 = paste(Set, BarrelA, BulletA, LandA, sep = "-")) # Creating ID similar to Heike's 
+  mutate(Bullet1 = paste(study1, BarrelB, BulletB, LandB, sep = "-"),
+         Bullet2 = paste(study1, BarrelA, BulletA, LandA, sep = "-"))# Creating ID similar to Heike's 
 
-
-features_2017 <- features_2017[order(features_2017$Set), ] #Ordered Set column so that all 173 observations came before 252 observations
-                                                          # At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
+features_2017 <- features_2017[order(features_2017$study1), ]
+#Ordered Set column so that all 173 observations came before 252 observations
+# At first glance Hamby173 Barrel 10, Bullet 1, Land 1 seems to be missing
 
 features_2017 <- features_2017 %>% 
   mutate(BarrelB = as.character(BarrelB), 
@@ -562,7 +557,7 @@ comparisons %>%
 features_2017 %>%                        # features_2017 plot 1
   filter(!is.na(BarrelA)) %>% 
     filter(!is.na(BarrelB)) %>% 
-      group_by(BarrelA, BarrelB, Set) %>% 
+      group_by(BarrelA, BarrelB, study1) %>% 
         summarise(count = n()) %>% 
   ggplot(aes(x = BarrelA, y = BarrelB))+
     geom_tile(aes(fill = count))+
@@ -570,18 +565,18 @@ features_2017 %>%                        # features_2017 plot 1
         geom_text(aes(label = count))+ 
           ggtitle("Comparison Count Version 1")+ 
             theme_bw()+ theme(axis.text.x = element_text(angle = 10))+
-              facet_grid(~Set) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format.
+              facet_grid(~study1) #Very Promising Results.  This geom_tile/heat_map shows my analysis in visual format.
 
 
 
 features_2017 %>%                       # features_2017 plot 2
  filter(!is.na(BarrelA)) %>%
    filter(!is.na(BarrelB)) %>%
-     group_by(BarrelA, BarrelB, Bullet1, Bullet2, Set) %>%
+     group_by(BarrelA, BarrelB, Bullet1, Bullet2, study1) %>%
       arrange(desc(signature_length2)) %>% 
        filter(row_number() == 1) %>% 
                 ungroup() %>% 
-  group_by(BarrelA, BarrelB, Set) %>%
+  group_by(BarrelA, BarrelB, study1) %>%
     summarise(count = n()) %>% 
       ggplot(aes(x = BarrelA, y = BarrelB))+
        geom_tile(aes(fill = count))+
@@ -589,13 +584,12 @@ features_2017 %>%                       # features_2017 plot 2
           geom_text(aes(label = count))+
             ggtitle("Comparison Count Version 2")+
               theme_bw()+ theme(axis.text.x = element_text(angle = 10))+
-                 facet_grid(~Set)
+                 facet_grid(~study1)
 ```
 
 We shall use the comparison plot from our 2019 data to help compare our data from 2017.
-Looking at features_2017 plot1 we can see that my analysis about duplicate data seems to be correct. 
-Looking at features_2017 plot2 we can see that there is also missing data on the Barrel-Bullet-Land level.
-Both of these visual representations are also written in the word.document 
+
+Looking at features_2017 plot2 we can see that there is missing data on the Barrel-Bullet-Land level.
 
 
 # Finding Missing Values 
@@ -631,165 +625,149 @@ finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what
 # Creating Data Frames for feature comparisons
 ```{r}
 #Better version of above method I think, using dplyr
-comparison_split <- comparisons %>%                                                    #Assign Comparisons
-  rowwise() %>%                                                                        #Every Row
-    mutate(sorter = paste(sort(c(Bullet1, Bullet2)), collapse="-")) %>%                # create col "sorter", which pastes both cols and sorts in order
-      distinct(sorter, .keep_all=T) %>%                                                # remove all rows with duplicate values in sorter
-        select(-sorter)                                                                # no need for column 
- 
 
+comparisons %>% group_by(Bullet1, Bullet2, ccf) %>% filter(Bullet1 == Bullet2) %>% summarise()
 
-feature_id1 <- features_2017[!duplicated(features_2017[c("Bullet1","Bullet2")]),] #profile1
-feature_id2 <- anti_join(features_2017, feature_id1)                              #profile2
+comparisons_for_join <- comparisons %>% 
+  filter(ccf != 1) %>% 
+    rowwise() %>%
+      mutate(sorter = paste(sort(c(Bullet1, Bullet2)), collapse = "-")) %>% 
+        distinct(sorter, .keep_all = T) %>% select(-sorter)
 
-feature_id1 <- na.omit(feature_id1) # Remove Na
-feature_id2 <- na.omit(feature_id2) # Remove Na
+#Assign Comparisons
+#Every Row
+# create col "sorter", which pastes both cols and sorts in order
+# remove all rows with duplicate values in sorter
+# no need for column 
 
-scatter1 <- inner_join(comparison_split, feature_id1, by = c("Bullet1", "Bullet2")) #ScatterPlot Comparisons for profile_id version 1
-scatter2 <- inner_join(comparison_split, feature_id2, by = c("Bullet1", "Bullet2")) # ScatterPlot Comparisons for Profile_id version 2
+comparisons_for_join <- na.omit(comparisons_for_join)# Remove Na
+features_2017 <- na.omit(features_2017) # Remove Na
+
+Joined_df <- inner_join(comparisons_for_join, features_2017, by = c("Bullet1", "Bullet2")) #ScatterPlot Comparisons for profile_id version 1
 ```
 
 # ScatterPlots
 ```{r}
+library(ggExtra)
 
-scatter1 %>% ggplot(aes(x = ccf, y = ccf2))+
+Joined_df %>% ggplot(aes(x = ccf, y = ccf2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
         ggtitle("ccf Vs ccf2")
 
-scatter2 %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+        
-        ggtitle("ScatterPlot2 ccf Vs ccf2")
-
-scatter1 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
+Joined_df %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("rough_cor Vs rough_cor2")
 
-scatter2 %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("ScatterPlot2 rough_cor Vs rough_cor2")
-
-scatter1 %>% ggplot(aes(x = cms, y = cms2x))+
+Joined_df %>% ggplot(aes(x = cms, y = cms2x))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("cms Vs cms2")
 
-scatter2 %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("ScatterPlot2 cms Vs cms2")
-
-scatter1 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
+Joined_df %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("sum_peaks Vs sum_peaks2")
-        
 
-scatter2 %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("ScatterPlot2 sum_peaks Vs sum_peaks2")
-
-scatter1 %>% ggplot(aes(x = signature_length, y = signature_length2))+
+Joined_df %>% ggplot(aes(x = signature_length, y = signature_length2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("signature_length Vs signature_length2")
 
-scatter2 %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("ScatterPlot2 signature_length Vs signature_length2")
-
-scatter1 %>% ggplot(aes(x = D, y = D2))+
+Joined_df %>% ggplot(aes(x = D, y = D2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
         ggtitle("Distance Vs Distance2")
 
-scatter2 %>% ggplot(aes(x = D, y = D2))+
+Joined_df %>% ggplot(aes(x = non_cms, y = non_cms2))+
   geom_bin2d(bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
         theme_bw()+
-        ggtitle("ScatterPlot2 Distance Vs Distance2")
+        ggtitle("non_cms vs noncms2")
+
+
+#-----------------------------------------------------------------------------#
+# Here is a subset of data plotted.  I did this because of all the overplotting.  Wanted to see if there was a relationship
+Joined_df %>% 
+  filter(BarrelA.y == 1 | BarrelA.y == 2 | BarrelA.y == 3) %>%
+     ggplot(aes(x = ccf, y = ccf2))+
+  geom_bin2d(bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("Avoid overplotting ccf Vs ccf2")
+
+Joined_df %>% 
+  filter(BarrelA.y == 1 | BarrelA.y == 2 | BarrelA.y == 3) %>%
+     ggplot(aes(x = cms, y = cms2x))+
+  geom_bin2d(bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+        theme_bw()+
+        ggtitle("Avoid overplotting ccf Vs ccf2")
+    
 ```
 
-# Scatter Plots
+Looking at the scatterplots we can make some observations but before that, let me go over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no clear linear relationship between x and y.  Over plotting is very bad in this case.  Though, the geom_smooth() methods "lm" and "gam" help a lot.  These two lines make it easier to see what sort of relationship is going on.
+
+
+
 ```{r}
-scatterA <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf2", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
+HambyDataLong <- gather(Joined_df, key="measure", value="value", c("ccf", "cms", "non_cms", "matches", "mismatches", "D", "sum_peaks"))
 
-scatterB <- gather(scatter1, key="measure", value="value", c("cms", "non_cms", "matches", "mismatches", "D", "sum_peaks", "signature_length", "ccf", "D2", "signature_length2", "matches2", "mismatches2", "cms2x", "non_cms2", "sum_peaks2")) 
-
-
-scatterA %>% 
-    ggplot(aes(x = ccf, y = value))+
-      geom_point()+
-      geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        facet_wrap(~measure, ncol = 4, scale = "free")+ scale_x_log10()+
-           theme_bw()+
-            ggtitle("ccf VS other features")
-
-
-scatterB %>% 
-    ggplot(aes(x = ccf2, y = value))+
-      geom_point()+
-      geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
+HambyDataLong2 <- gather(Joined_df, key="measure", value="value", c("ccf2", "cms2x", "non_cms2", "matches2", "mismatches2", "D2", "sum_peaks2"))
+      
+HambyDataLong %>% 
+    ggplot(aes(value, fill = match))+
+      geom_density(position = "identity", alpha = 0.50)+
         facet_wrap(~measure, ncol = 4, scale = "free")+
-          theme_bw()+
-            ggtitle("ccf2 VS other features")
+          scale_fill_brewer(palette = "Paired") + theme_bw()+
+            ggtitle("Marginal Density for Features 2019 Data")
 
+HambyDataLong %>% 
+    ggplot(aes(value, fill = match))+
+      geom_density(position = "identity", alpha = 0.50)+
+        facet_wrap(~measure + study1, ncol = 4, scale = "free")+
+          scale_fill_brewer(palette = "Paired") + theme_bw()+
+            ggtitle("Marginal Density for Features")
 
-#scatterA %>% 
-    #ggplot(aes(x = cms, y = value))+
-      #geom_point()+
-      #geom_smooth(method = lm)+
-      #geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        #facet_wrap(~measure, ncol = 4, scale = "free")+
-           #theme_bw()+ 
-            #ggtitle("cms VS other features")
-#scatterB %>% 
-    #ggplot(aes(x = cms2x, y = value))+
-      #geom_point()+
-      #geom_smooth(method = lm)+
-      #geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        #facet_wrap(~measure, ncol = 4, scale = "free")+
-         #theme_bw()+
-            #ggtitle("cms2x VS other features")
+HambyDataLong2 %>% 
+    ggplot(aes(value, fill = match))+
+      geom_density(position = "identity", alpha = 0.50)+
+        facet_wrap(~measure, ncol = 4, scale = "free")+
+          scale_fill_brewer(palette = "Paired") + theme_bw()+
+            ggtitle("Marginal Density for Features")
 
-#---------------------------------------------------------------------------------------#
-#CHECK 
+HambyDataLong2 %>% 
+    ggplot(aes(value, fill = match))+
+      geom_density(position = "identity", alpha = 0.50)+
+        facet_wrap(~measure + study1, ncol = 4, scale = "free")+
+          scale_fill_brewer(palette = "Paired") + theme_bw()+
+            ggtitle("Marginal Density for Features 2017")
+```
+
+```{r}
+#Statistical Summary
+
+Joined_df %>% select(ccf, ccf2, cms, cms2x, D, D2, matches, matches2, mismatches, mismatches2, non_cms, non_cms2, sum_peaks, sum_peaks2) %>% summary()
+
 ```
 
 
-Looking at the normal/facet_grid scatterplots we can make some observations but before that, let me go over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no linear relationship between x and y. For the graphs where ccf, ccf2, cms, and cms2 are compared to the other features, we also see no linear relationships between x and y. The scatterplots look like huge clouds.
-
-
+The statistical summary is also concerning because some of the features such as D and D2 differ by a lot.
 
 
 
