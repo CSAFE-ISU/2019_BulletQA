@@ -726,37 +726,18 @@ Looking at the scatterplots we can make some observations but before that, let m
 
 
 ```{r}
-HambyDataLong <- gather(Joined_df, key="measure", value="value", c("ccf", "cms", "non_cms", "matches", "mismatches", "D", "sum_peaks"))
-
-HambyDataLong2 <- gather(Joined_df, key="measure", value="value", c("ccf2", "cms2x", "non_cms2", "matches2", "mismatches2", "D2", "sum_peaks2"))
-      
-HambyDataLong %>% 
+Hamby_Data_Long_by_YEAR <- Joined_df %>% 
+  select(1:2, match, ccf:sum_peaks, ccf2:sum_peaks2) %>% 
+    gather(key="measure", value="value", ccf:sum_peaks2) %>%   
+      mutate(Year = if_else(grepl("^.+(2|2x)$", measure), 2017, 2019)) %>% 
+        mutate(measure = str_remove(measure, "2x?$"))
+        
+Hamby_Data_Long_by_YEAR %>%
     ggplot(aes(value, fill = match))+
       geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure, ncol = 4, scale = "free")+
+        facet_wrap(~Year+measure, nrow = 2, scales = "free")+
           scale_fill_brewer(palette = "Paired") + theme_bw()+
             ggtitle("Marginal Density for Features 2019 Data")
-
-HambyDataLong %>% 
-    ggplot(aes(value, fill = match))+
-      geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure + study1, ncol = 4, scale = "free")+
-          scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features")
-
-HambyDataLong2 %>% 
-    ggplot(aes(value, fill = match))+
-      geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure, ncol = 4, scale = "free")+
-          scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features")
-
-HambyDataLong2 %>% 
-    ggplot(aes(value, fill = match))+
-      geom_density(position = "identity", alpha = 0.50)+
-        facet_wrap(~measure + study1, ncol = 4, scale = "free")+
-          scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features 2017")
 ```
 
 ```{r}
