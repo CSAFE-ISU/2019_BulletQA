@@ -2,7 +2,9 @@
 title: "Refit Analysis"
 author: "Andrew Maloney"
 date: "6/7/2019"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -27,10 +29,11 @@ library(gridExtra)
 library(tidyr)
 options(future.globals.maxSize = 4*1024*1024*1024)
 #data_dir <- "/media/Raven/REU_Refit"
-
+load("Data_Needed.RData")
 
 ```
 
+#Reading in Hamby Data
 ```{r eval=FALSE, include=TRUE}
 # Reading in Hamby_173
 df <- tibble(path = list.files(path = "Hamby_173", 
@@ -44,7 +47,6 @@ df <- tibble(path = list.files(path = "Hamby_173",
            str_remove("land")) %>% 
   mutate(Set = "Hamby173") %>%
   mutate(x3p = map(path, read_x3p)) %>%
- 
   mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
 
 # Reading in Hamby_252
@@ -69,7 +71,7 @@ hamby <- hamby %>%
 rm(df, df2)
 ```
 
-# Cross Sections look good.
+# Cross Sections
 ```{r eval=FALSE, include=TRUE}
 plan(multicore) # use all the cores at once
 hamby <- hamby %>%
@@ -78,7 +80,9 @@ hamby <- hamby %>%
 
 head(select(hamby, -path, -x3p), 5)
 #hamby %>% arrange(desc(CrossSection))
+```
 
+```{r}
 plot1 = hamby %>% 
   filter(Barrel != "Unknown") %>% 
     ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
@@ -123,12 +127,14 @@ crosscuts %>%
     ggplot(data = ., aes(x = x, y = value, color = Land)) + 
       geom_line() + 
         facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+ggsave("CrossCutPlot1.png")
 
 crosscuts %>%
   filter(Barrel != "Unknown" & Set == "Hamby252") %>% 
     ggplot(data = ., aes(x = x, y = value, color = Land)) + 
       geom_line() + 
         facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+ggsave("CrossCutPlot2.png")
 
 crosscuts %>% 
   filter(Set == "Hamby173" & Barrel == "Unknown") %>%
@@ -334,21 +340,28 @@ Signatures %>%
   filter(Barrel != "Unknown") %>% 
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line()+
-  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel)) # put the barrels in the right order
+  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+  ggtitle("Signatures Barrels 1-10")
+# put the barrels in the right order
+ggsave("Signature_Plot1.png")
 
 Signatures %>%
   filter(Set == "Hamby173") %>%
   filter(Barrel == "Unknown") %>% 
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line()+
-  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)+
+    ggtitle("Barrels Unknown for Hamby 173")
+ggsave("Signature_Plot2.png")
 
 Signatures %>%
   filter(Set == "Hamby252") %>%
   filter(Barrel == "Unknown") %>% 
 ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
   geom_line()+
-  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)+
+    ggtitle("Barrels Unknown for Hamby 252")
+ggsave("Signature_Plot3.png")
 
 ```
 
@@ -440,7 +453,7 @@ features_2017 <- features_2017 %>%
       rename(BarrelA = barrel2, BulletA = bullet2, LandA = land2) %>% # Changed column names
           mutate(study1 = gsub("Hamby44", "Hamby173", study1)) %>% #Chnaging observation name
             mutate(study1 = factor(study1, levels = c("Hamby173", "Hamby252"))) %>% # for ordering principles
-      rename(ccf2 = ccf, rough_cor2 = rough_cor, lag2 = lag, D2 = D, sd_D2 = sd_D, signature_length2 = signature_length, overlap2 = overlap, matches2 = matches, mismatches2 = mismatches, cms2x = cms, non_cms2 = non_cms, sum_peaks2 = sum_peaks) # Column names changed for comparing purposes 
+      rename(ccf_2017 = ccf, rough_cor_2017 = rough_cor, lag_2017 = lag, D_2017 = D, sd_D_2017 = sd_D, signature_length_2017 = signature_length, overlap_2017 = overlap, matches_2017 = matches, mismatches_2017 = mismatches, cms_2017 = cms, non_cms_2017 = non_cms, sum_peaks_2017 = sum_peaks) # Column names changed for comparing purposes 
 
 
 #Exploring we see that all lettered Barrels only have bullet equal to 1. No need to worry about a lettered barrel having a bullet 2
@@ -573,7 +586,7 @@ features_2017 %>%                       # features_2017 plot 2
  filter(!is.na(BarrelA)) %>%
    filter(!is.na(BarrelB)) %>%
      group_by(BarrelA, BarrelB, Bullet1, Bullet2, study1) %>%
-      arrange(desc(signature_length2)) %>% 
+      arrange(desc(signature_length_2017)) %>% 
        filter(row_number() == 1) %>% 
                 ungroup() %>% 
   group_by(BarrelA, BarrelB, study1) %>%
@@ -599,6 +612,8 @@ Looking at features_2017 plot2 we can see that there is missing data on the Barr
 #https://www.r-bloggers.com/r-sorting-a-data-frame-by-the-contents-of-a-column/
 #https://www.rdocumentation.org/packages/base/versions/3.6.0/topics/t 
 
+comparisons <- comparisons %>% rename(ccf_2019 = ccf, rough_cor_2019 = rough_cor, lag_2019 = lag, D_2019 = D, sd_D_2019 = sd_D, signature_length_2019 = signature_length, overlap_2019 = overlap, matches_2019 = matches, mismatches_2019 = mismatches, cms_2019 = cms, non_cms_2019 = non_cms, sum_peaks_2019 = sum_peaks)
+
 comparisons_check <- comparisons %>% 
   select(Bullet1, Bullet2) #Remove Columns we wont be using
 
@@ -619,6 +634,8 @@ finder <- finder %>%
     select(Bullet1, Bullet2) 
       
 finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what data is missing and if you add Bullet1 to the anti_join you can see all thee missing Unknown|Unknown Comparisons 
+
+head(finder, 10)
 ```
 
 
@@ -626,10 +643,10 @@ finder <- anti_join(finder, features_2017_check, by = c("Bullet2")) # Shows what
 ```{r}
 #Better version of above method I think, using dplyr
 
-comparisons %>% group_by(Bullet1, Bullet2, ccf) %>% filter(Bullet1 == Bullet2) %>% summarise()
+comparisons %>% group_by(Bullet1, Bullet2, ccf_2019) %>% filter(Bullet1 == Bullet2) %>% summarise()
 
 comparisons_for_join <- comparisons %>% 
-  filter(ccf != 1) %>% 
+  filter(ccf_2019 != 1) %>% 
     rowwise() %>%
       mutate(sorter = paste(sort(c(Bullet1, Bullet2)), collapse = "-")) %>% 
         distinct(sorter, .keep_all = T) %>% select(-sorter)
@@ -648,77 +665,96 @@ Joined_df <- inner_join(comparisons_for_join, features_2017, by = c("Bullet1", "
 
 # ScatterPlots
 ```{r}
-library(ggExtra)
 
-Joined_df %>% ggplot(aes(x = ccf, y = ccf2))+
-  geom_bin2d(bins = 65)+
+Joined_df %>% ggplot(aes(x = ccf_2019, y = ccf_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"),show.legend = FALSE)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Cross Correlation")
+ggsave("ScatterPlot_6.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = rough_cor_2019, y = rough_cor_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        ggtitle("ccf Vs ccf2")
-
-Joined_df %>% ggplot(aes(x = rough_cor, y = rough_cor2))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Rough Correlation from two (or more) Aligned Signatures")
+ggsave("Scatter_Plot7.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = lag_2019, y = lag_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
+  geom_smooth(method = lm)+
+      geom_smooth(aes(colour = "red"),show.legend = FALSE)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Lag from two (or more) Aligned Signatures")
+ggsave("Scatter_Plot8.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = D_2019, y = D_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("rough_cor Vs rough_cor2")
-
-Joined_df %>% ggplot(aes(x = cms, y = cms2x))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Average Distance between two (or more) Aligned Signatures")
+ggsave("Scatter_Plot9.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = sd_D_2019, y = sd_D_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("cms Vs cms2")
-
-Joined_df %>% ggplot(aes(x = sum_peaks, y = sum_peaks2))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Variation in the Height Measurements between two Aligned Signatures")
+ggsave("Scatter_Plot10.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = signature_length_2019, y = signature_length_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("sum_peaks Vs sum_peaks2")
-
-Joined_df %>% ggplot(aes(x = signature_length, y = signature_length2))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("signature_length_2019 Vs signature_length_2017")
+ggsave("Scatter_Plot11.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = cms_2019, y = cms_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("signature_length Vs signature_length2")
-
-Joined_df %>% ggplot(aes(x = D, y = D2))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Consecutively Matching Striation Marks")
+ggsave("Scatter_Plot12.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = non_cms_2019, y = non_cms_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("Distance Vs Distance2")
-
-Joined_df %>% ggplot(aes(x = non_cms, y = non_cms2))+
-  geom_bin2d(bins = 65)+
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Consecutively Non-Matching Striation Marks")
+ggsave("Scatter_Plot13.png")
+#------------------------------------------------------------------###
+Joined_df %>% ggplot(aes(x = sum_peaks_2019, y = sum_peaks_2017))+
+  geom_bin2d(aes(fill = match), bins = 65)+
   geom_smooth(method = lm)+
       geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("non_cms vs noncms2")
-
-
-#-----------------------------------------------------------------------------#
-# Here is a subset of data plotted.  I did this because of all the overplotting.  Wanted to see if there was a relationship
-Joined_df %>% 
-  filter(BarrelA.y == 1 | BarrelA.y == 2 | BarrelA.y == 3) %>%
-     ggplot(aes(x = ccf, y = ccf2))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("Avoid overplotting ccf Vs ccf2")
-
-Joined_df %>% 
-  filter(BarrelA.y == 1 | BarrelA.y == 2 | BarrelA.y == 3) %>%
-     ggplot(aes(x = cms, y = cms2x))+
-  geom_bin2d(bins = 65)+
-  geom_smooth(method = lm)+
-      geom_smooth(aes(colour = "red"), show.legend = FALSE)+
-        theme_bw()+
-        ggtitle("Avoid overplotting ccf Vs ccf2")
-    
+        scale_fill_manual(values = c("#cab2d6","#fdbf6f"))+
+          theme_bw()+
+            xlab("2019") + ylab("2017")+
+              ggtitle("Combined Height of Aligned Striae between two Aligned Signatures")
+ggsave("Scatter_Plot14.png")
 ```
 
 Looking at the scatterplots we can make some observations but before that, let me go over some details.  Two geom_smooth() layers were added.  The blue line represents a lm method and the red line represents the gam method.  Looking at the graphs where each feature is compared with its other version, we see there is no clear linear relationship between x and y.  Over plotting is very bad in this case.  Though, the geom_smooth() methods "lm" and "gam" help a lot.  These two lines make it easier to see what sort of relationship is going on.
@@ -727,28 +763,111 @@ Looking at the scatterplots we can make some observations but before that, let m
 
 ```{r}
 Hamby_Data_Long_by_YEAR <- Joined_df %>% 
-  select(1:2, match, ccf:sum_peaks, ccf2:sum_peaks2) %>% 
-    gather(key="measure", value="value", ccf:sum_peaks2) %>%   
-      mutate(Year = if_else(grepl("^.+(2|2x)$", measure), 2017, 2019)) %>% 
-        mutate(measure = str_remove(measure, "2x?$"))
+  select(1:2, match, ccf_2019:sum_peaks_2019, ccf_2017:sum_peaks_2017) %>% 
+    gather(key="measure", value="value", ccf_2019:sum_peaks_2017) %>%   
+      mutate(Year = if_else(grepl("^.+(2017)$", measure), 2017, 2019),
+             measure = str_remove(measure, "(_2017|_2019)?$"))
         
 Hamby_Data_Long_by_YEAR %>%
     ggplot(aes(value, fill = match))+
       geom_density(position = "identity", alpha = 0.50)+
         facet_wrap(~Year+measure, nrow = 2, scales = "free")+
           scale_fill_brewer(palette = "Paired") + theme_bw()+
-            ggtitle("Marginal Density for Features 2019 Data")
+            ggtitle("Marginal Density Plots")
+ggsave("Density_Plot.png", width = 15, height = 7)
 ```
 
 ```{r}
 #Statistical Summary
 
-Joined_df %>% select(ccf, ccf2, cms, cms2x, D, D2, matches, matches2, mismatches, mismatches2, non_cms, non_cms2, sum_peaks, sum_peaks2) %>% summary()
+Joined_df %>% select(ccf_2019:sum_peaks_2019, ccf_2017:sum_peaks_2017) %>% summary()
 
 ```
 
 
-The statistical summary is also concerning because some of the features such as D and D2 differ by a lot.
+# Bullet Scores
+### Currently on hold
+```{r eval=FALSE, include=TRUE}
+comparisons$rfscore <- predict(rtrees, newdata = comparisons, type = "prob")[,2]
+head(comparisons, 500)
+
+Bullet_Scores <- comparisons %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores <- Bullet_Scores %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores %>% 
+  select(-data) %>% 
+    arrange(desc(Bullet_Score))
+
+
+Bullet_Scores <- Bullet_Scores %>% 
+  mutate(data = data %>% 
+           future_map(.f = function(d){
+              d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+
+Bullet_Scores %>% 
+  tidyr::unnest(data) 
+```
+
+```{r eval=FALSE, include=TRUE}
+
+Bullet_Scores_Examin <- Bullet_Scores %>% 
+  tidyr::unnest(data)
+
+Bullet_Scores_Examin %>% 
+  filter(samepath == "TRUE")
+
+
+Bullet_Scores_Examin %>% 
+  filter(samepath == "FALSE")
+```
+
+
+# Comparing rfscores
+### Currently on hold
+```{r eval=FALSE, include=TRUE}
+library(gridExtra)
+
+plot1 = comparisons %>%
+  filter(BarrelA == 2 & BarrelB == 2) %>% 
+    filter(BulletA == 1 & BulletB == 1 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5) +facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ ggtitle("Same Source and Same Bullet")+ facet_grid(~Set)
+
+plot2 = comparisons %>%
+  filter(BarrelA == 2 & BarrelB == 2) %>% 
+    filter(BulletA == 1 & BulletB == 2 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
+            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+ 
+              ggtitle("Same Source but Different Bullet") + facet_grid(~Set)
+
+
+plot3 = comparisons %>% 
+  filter(BarrelA == 10 & BarrelB == 5) %>% 
+    filter(BulletA == 1 & BulletB == 2 ) %>% 
+      ggplot(aes(x = LandA, y = LandB, fill = rfscore))+ 
+        geom_tile()+ 
+          scale_fill_gradient2(low = "#000000", high = "#56B4E9", midpoint = 0.5)+
+            facet_grid(BulletB~BulletA, labeller = "label_both")+ 
+            xlab("Land A") + ylab("Land B") + theme(aspect.ratio = 1)+
+              ggtitle("Different Source") + facet_grid(~Set)
+
+grid.arrange(plot1, plot2, plot3, ncol = 2)
+
+```
+
 
 
 
