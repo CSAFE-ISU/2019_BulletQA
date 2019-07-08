@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+rgl::setupKnitr()
 ```
 
 # R Markdown
@@ -61,7 +62,7 @@ df2 <- tibble(path = list.files(path = file.path(data_dir, "Hamby_252"),
   mutate(Set = "Hamby252") %>%
   mutate(x3p = map(path,read_x3p))  %>%
   # Adjust orientation
-  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
+  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = 90)))
 
 # One big data set - easier to debug the code if you do everything in one big go.
 hamby <- bind_rows(df, df2) 
@@ -118,6 +119,26 @@ crosscuts %>%
 Note: For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
 
 Note: For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
+
+```{r, rgl=TRUE, dev='png'}
+bad_crosscuts <- filter(hamby, CrossSection > 200) %>%
+  select(id, CrossSection)
+
+purrr::map(1:nrow(bad_crosscuts), function(idx) {
+  x <- bad_crosscuts[idx,]
+  filter(hamby, id == x$id)$x3p[[1]] %>% 
+    image_x3p(size = c(1800, 600), crosscut = x$CrossSection)
+  
+  Sys.sleep(2)
+  rgl::text3d(x = .03,  y = .97, z = 0.3, x$id, col = "Black")
+})
+
+hamby <- hamby %>%
+  mutate(remove = id %in% c("Hamby173-Unknown-B-3", "Hamby252-7-1-3", "Hamby252-Unknown-B-2", "Hamby252-Unknown-S-4")) 
+# Can't actually remove things until after we load grooves from the file...
+```
+Remove 252-Unk-B-2, 252-7-1-3, 173-Unk-B-3, 252-Unk-S-4 due to pitting and tank rash.
+
 
 ```{r}
 #Looking at CrossCuts to see any issues
@@ -176,6 +197,8 @@ if (file.exists(saved_grooves_location)) {
 }
 
 grooves <- hamby %>% tidyr::unnest(Grooves)
+
+hamby <- hamby %>% filter(!remove)
 
 head(grooves, 10)
 
@@ -241,7 +264,7 @@ rm(Hamby_test, Hamby_test2, Hamby_test3, Hamby_test4, Hamby_test5, Hamby_test6, 
 # When run in interactive mode, a shiny app can be used to set smarter grooves.
 # Groove Identifications by: Andrew Maloney
 # Using Shiny App
-```{r get-grooves-interactive, eval=FALSE, include=TRUE}
+```{r get-grooves-interactive, eval=FALSE, include=F}
 library(shiny)
 if (file.exists(saved_grooves_location)) {
   hamby$Grooves <- readRDS(saved_grooves_location)
@@ -326,7 +349,7 @@ if (interactive()) { # only run when you're manually running chunks... don't run
 ```{r eval=FALSE, include=TRUE}
 #Signatures
 hamby <- hamby %>% 
-  mutate(Signatures = map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
+  mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
 
 Signatures <- hamby %>% 
   select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
@@ -386,20 +409,20 @@ comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
 ```{r eval=FALSE, include=TRUE}
 #plan(multicore(workers = availableCores(constraints = 8)))
 
+plan(multicore)
+
 get_sig <- function(data) {
   map(data$Signatures, "sig")
 }
 comparisons <- comparisons %>%
-  mutate(sig1 = map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
-
-plan(multicore)
+  mutate(sig1 = future_map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
 
 comparisons <- comparisons %>%
-  mutate(Aligned = map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
 
 # Get striae
 comparisons <- comparisons %>%
-  mutate(Striae = map(Aligned, sig_cms_max)) # Obtaining Striae
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
 
 saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
 ```
