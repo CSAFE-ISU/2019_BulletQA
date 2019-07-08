@@ -1,0 +1,449 @@
+---
+title: "Calculating Features with `bulletxtrctr`"
+author: "Andrew Maloney and Molly McDermott"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# R Markdown
+```{r}
+#Loading Packages
+#Will most likely add more
+library(dplyr)
+library(bulletxtrctr)
+library(x3ptools)
+library(randomForest)
+library(ggplot2)
+library(readr)
+library(furrr)
+library(stringr)
+library(dichromat)
+library(purrr)
+library(future)
+library(gridExtra)
+library(tidyr)
+options(future.globals.maxSize = 4*1024*1024*1024)
+data_dir <- "/media/Raven/REU_Refit"
+load("Data_NeededV3.RData")
+
+```
+
+#Reading in Hamby Data
+```{r eval=FALSE, include=TRUE}
+# Reading in Hamby_173
+df <- tibble(path = list.files(path = file.path(data_dir, "Hamby_173"), 
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% 
+  mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% 
+           str_remove("Barrel"), 
+         Bullet = str_extract(path, "Bullet[12A-Z]") %>% 
+           str_remove("Bullet"),
+         Land = str_extract(path, "land\\d{1}") %>% 
+           str_remove("land")) %>% 
+  mutate(Set = "Hamby173") %>%
+  mutate(x3p = map(path, read_x3p)) %>%
+  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% y_flip_x3p()))
+
+# Reading in Hamby_252
+df2 <- tibble(path = list.files(path = file.path(data_dir, "Hamby_252"), 
+                                pattern = ".x3p", recursive = T, 
+                                full.names = T)) %>% 
+  mutate(Barrel = str_extract(path, "(Unknown|Barrel)\\d{0,2}") %>% 
+           str_remove("Barrel"), 
+         Bullet = str_extract(path, "Bullet[12A-Z]") %>% 
+           str_remove("Bullet"), 
+         Land = str_extract(path, "Bullet [12A-Z]-[123456]") %>% 
+           str_remove("Bullet [12A-Z]-")) %>% 
+  mutate(Set = "Hamby252") %>%
+  mutate(x3p = map(path,read_x3p))  %>%
+  # Adjust orientation
+  mutate(x3p = map(x3p, ~x3p_m_to_mum(.) %>% rotate_x3p(angle = -90) %>% y_flip_x3p()))
+
+# One big data set - easier to debug the code if you do everything in one big go.
+hamby <- bind_rows(df, df2) 
+hamby <- hamby %>%
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Set, Barrel, Bullet, Land, x3p, path)
+rm(df, df2)
+```
+
+# Cross Sections
+```{r eval=FALSE, include=TRUE}
+plan(multicore) # use all the cores at once
+hamby <- hamby %>%
+  mutate(
+    CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, minccf = 0.9, span = 0.3, percent_missing = 25))
+
+head(select(hamby, -path, -x3p), 5)
+#hamby %>% arrange(desc(CrossSection))
+```
+
+```{r}
+plot1 = hamby %>% 
+  filter(Barrel != "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+          ggtitle("Barrels 1-10")
+
+plot2 = hamby %>% 
+  filter(Barrel == "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+          ggtitle("Barrel Unknown")
+
+grid.arrange(plot1, plot2)
+```
+
+Looking at the Boxplot for Barrels 1-10, we can see the inter-quartile ranges seem to be roughly the same for each Bullet.  For Barrels 1-10, Bullet 2 seems to have higher values than Bullet 1.  Barrels 6 and 7 have the largest whiskers.  Barrel 1, Bullet 1 has the smallest inter-quartile range and Barrel 9, Bullet 2 has the largest interquartile range.  There is one apparent outlier for Barrel 10, Bullet 1.  This CrossSection Value is not high enough for concern when looking at all Barrels but should be examined separately.
+
+Looking at the Boxplot for Barrel "Unknown" we can see an apparent outlier for Bullet B.  This CrossSection value is 400.  Unlike with Barrels 1-10 we can see the Bullets for Barrel "Unknown" have noticeably  more lower whiskers.
+
+
+```{r eval=FALSE, include=TRUE}
+#Cross Sections
+hamby <- hamby %>% 
+  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
+crosscuts <- select(hamby, -path, -x3p) %>% 
+      tidyr::unnest(CrossCut)
+
+crosscuts %>% 
+  arrange(desc(CrossSection))
+```
+
+Note: For Hamby173 barrels 1, 2, and 4 for bullet 1 seem to have higher crosscut values plotted.  For Hamby173 barrel 1, bullet 2 seems to have a higher crosscut values plotted. There doesn't seem to be any noticeably low values for Hamby173.
+
+Note: For Hamby 252 barrel 10 and 2, bullet 1 has high crosscut values plotted.  There also seems to be some low crosscut values plotted as well. 
+
+```{r}
+#Looking at CrossCuts to see any issues
+
+crosscuts %>%
+  filter(Barrel != "Unknown" & Set == "Hamby173") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+ggsave("CrossCutPlot1.png")
+
+crosscuts %>%
+  filter(Barrel != "Unknown" & Set == "Hamby252") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+ggsave("CrossCutPlot2.png")
+
+crosscuts %>% 
+  filter(Set == "Hamby173" & Barrel == "Unknown") %>%
+    ggplot(aes(x = x, y = value)) + 
+      geom_line() +
+        facet_grid(Bullet~Land, labeller="label_both") +
+          theme_bw()+ ggtitle("Barrel Unknown for Hamby173")
+
+crosscuts %>% 
+  filter(Set == "Hamby252" & Barrel == "Unknown") %>%
+    ggplot(aes(x = x, y = value)) + 
+      geom_line() +
+        facet_grid(Bullet~Land, labeller="label_both") +
+          theme_bw()+ ggtitle("Barrel Unknown for Hamby252")
+
+crosscuts %>% filter(id == "Hamby252-Unknown-B-2") %>% 
+  ggplot(aes(x = x, y = value))+
+    geom_line()+
+      facet_grid(Bullet~Land + Set, labeller = "label_both")+
+        theme_bw() + ggtitle("High CrossSection Bullet B")
+```
+
+Looking at the CrossCuts we can see the side profile for a bullets land impression for every barrel in Hamby173 and Hamby252.  For most of the CrossCuts the shoulders can be clearly identified but there are some that can not be "clearly" identified due to possbile tank rash, pitting, or scans that do not meet the standards that forensic analysis require.  I can not say for certain if there are scans that should be excluded.  I used FIX3P to examine the "groove to groove" scans and noticed considerable tank rash on some of the scans.  There was some noticeable pitting as well but I only felt it was a concern when the pitting was concentrated in the center of the "groove to groove" scan.
+
+When looking at the Crosscuts we can see most have noticeable curvature.  There are some scans that do not and these scans can look like a flat line or even a traingle... I Have made note of these particular scans as well.  
+
+
+# Groove Loader
+```{r eval=FALSE, include=TRUE}
+#Grooves
+saved_grooves_location <- "V2H173_H252_Grooves_data.rda"
+if (file.exists(saved_grooves_location)) {
+  hamby$Grooves <- readRDS(saved_grooves_location)
+} else {
+  hamby <- hamby %>% 
+    mutate(Grooves = CrossCut %>% 
+             map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
+
+grooves <- hamby %>% tidyr::unnest(Grooves)
+
+head(grooves, 10)
+
+head(select(hamby, -path, -x3p, -CrossCut), 5)
+```
+
+
+# Examining Groove Cut Offs
+```{r eval=FALSE, include=TRUE}
+Hamby_test <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 6)
+
+Hamby_test2 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 3 & Bullet == 1)
+
+Hamby_test3 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 1 & Bullet == 1)
+
+Hamby_test4 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == 9 & Bullet == 2)
+
+Hamby_test5 <- hamby %>% 
+  filter(Set == "Hamby252") %>% 
+    filter(Barrel == "Unknown") %>% 
+      filter(Bullet == "B" | Bullet == "S" | Bullet == "U")
+
+Hamby_test6 <- hamby %>% 
+  filter(Set == "Hamby173") %>% 
+    filter(Barrel == 3 & Bullet == 2)
+
+Hamby_test7 <- hamby %>% 
+  filter(Set == "Hamby173") %>% 
+    filter(Barrel == "Unknown") %>% 
+      filter(Bullet == "B" | Bullet == "E" | Bullet == "U")
+
+
+gridExtra::grid.arrange(Hamby_test$Grooves[[1]]$plot,
+                        Hamby_test$Grooves[[7]]$plot,
+                         Hamby_test2$Grooves[[4]]$plot,
+                         Hamby_test3$Grooves[[6]]$plot,
+                         Hamby_test4$Grooves[[4]]$plot,
+                         Hamby_test5$Grooves[[2]]$plot,
+                         Hamby_test5$Grooves[[10]]$plot,
+                        nrow = 2)
+                        
+                        
+
+                        
+gridExtra::grid.arrange(Hamby_test6$Grooves[[1]]$plot,
+                        Hamby_test7$Grooves[[3]]$plot,
+                        Hamby_test7$Grooves[[15]]$plot,
+                        Hamby_test7$Grooves[[12]]$plot,
+                        nrow = 2)
+
+rm(Hamby_test, Hamby_test2, Hamby_test3, Hamby_test4, Hamby_test5, Hamby_test6, Hamby_test7 )
+```
+
+
+# When run in interactive mode, a shiny app can be used to set smarter grooves.
+# Groove Identifications by: Andrew Maloney
+# Using Shiny App
+```{r get-grooves-interactive, eval=FALSE, include=TRUE}
+library(shiny)
+if (file.exists(saved_grooves_location)) {
+  hamby$Grooves <- readRDS(saved_grooves_location)
+}
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(hamby$Grooves)) %>% set_names(hamby$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- hamby$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", hamby$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", hamby$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(hamby$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(hamby$Grooves)) %>% set_names(hamby$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(hamby$Grooves, file = saved_grooves_location)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- hamby$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          hamby$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          hamby$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- hamby$Grooves[[k]]$plot +
+            geom_vline(xintercept = hamby$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = hamby$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(hamby$Grooves, file = saved_grooves_location)
+} else {
+  if (!file.exists(saved_grooves_location)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    hamby$Grooves <- readRDS(saved_grooves_location)
+  }
+}
+
+
+#Test Some Grooves(performed:06/12/19)
+```
+
+```{r eval=FALSE, include=TRUE}
+#Signatures
+hamby <- hamby %>% 
+  mutate(Signatures = map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03)) 
+
+Signatures <- hamby %>% 
+  select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
+    tidyr::unnest()
+```
+
+```{r}
+#Looking for major issues - grooves not set correctly (large deviations at beginning or end of a line)
+
+Signatures %>%
+  filter(Barrel != "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line()+
+  facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+  ggtitle("Signatures Barrels 1-10")
+# put the barrels in the right order
+ggsave("Signature_Plot1.png")
+
+Signatures %>%
+  filter(Set == "Hamby173") %>%
+  filter(Barrel == "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line()+
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)+
+    ggtitle("Barrels Unknown for Hamby 173")
+ggsave("Signature_Plot2.png")
+
+Signatures %>%
+  filter(Set == "Hamby252") %>%
+  filter(Barrel == "Unknown") %>% 
+ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+  geom_line()+
+  facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel), ncol = 4)+
+    ggtitle("Barrels Unknown for Hamby 252")
+ggsave("Signature_Plot3.png")
+
+```
+
+Examining the Signature Profiles we can see for barrels 1-10, for both Hamby173 + Hamby252, that the signatures for lands 1-6 are aligned pretty well.  There seems to be some noticeable deviations at the beginning and end for Barrels 1-10 in both sets. I looked at the groove to groove scans using FIX3P and these spikes at the beginning and end for Barrels 1 and 10 can be identified.  Groove locations seem to be set correctly for these lands.  
+
+There is some noticeable missing data for Signature comparisons [Hamby252/Bullet1] when filling by Bullet.  This is hard to see when filling by the Lands.
+
+We also examine the number of consecutively matching peaks in signatures for two aligned lands.(Case Validation Paper)
+
+Groove Identifications Approved
+
+```{r eval=FALSE, warning=FALSE, include=TRUE}
+comparisons <- crossing(Bullet1 = hamby$id, Bullet2 = hamby$id) %>%
+  left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(hamby, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
+  mutate(Set1 = str_extract(Bullet1, "Hamby\\d{2,3}"),
+         Set2 = str_extract(Bullet2, "Hamby\\d{2,3}")) %>%
+  filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
+  select(-matches("Set"))
+```
+
+```{r eval=FALSE, include=TRUE}
+#plan(multicore(workers = availableCores(constraints = 8)))
+
+get_sig <- function(data) {
+  map(data$Signatures, "sig")
+}
+comparisons <- comparisons %>%
+  mutate(sig1 = map(Bullet1_data, get_sig), sig2 = purrr::map(Bullet2_data, get_sig))
+
+plan(multicore)
+
+comparisons <- comparisons %>%
+  mutate(Aligned = map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+
+# Get striae
+comparisons <- comparisons %>%
+  mutate(Striae = map(Aligned, sig_cms_max)) # Obtaining Striae
+
+saveRDS(select(comparisons, -Bullet1_data, -Bullet2_data), file = "Hamby_173_252_Comparisons.rda")
+```
+
+# Extracting features
+```{r eval=FALSE, include=TRUE}
+comparisons <- comparisons %>% 
+  select(-Bullet1_data, -Bullet2_data)
+
+comparisons <- comparisons %>% 
+  mutate(features = map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625)) #ObtainingFeatures
+
+comparisons <- comparisons %>% 
+  mutate(Legacy_Features = map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+
+comparisons_legacy <- comparisons %>% 
+  select(-features) %>%
+  tidyr::unnest(Legacy_Features) # Extracting feature legacy
+
+comparisons <- comparisons %>%
+  select(-Legacy_Features) %>%
+  tidyr::unnest(features)
+
+write.csv(comparisons, file = "2019_new_features.csv")
+write.csv(comparisons_legacy, file = "2019_legacy_features.csv")
+
+```
+
+
+# Creating Columns for organization and for future plotting purposes.
+```{r}
+comparisons <- comparisons %>% 
+  mutate(Set = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\1", Bullet2)) # Creating columns from IDs
+comparisons <- comparisons %>% 
+  mutate(BarrelA = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Bullet2))
+comparisons <- comparisons %>% 
+  mutate(BarrelB = gsub("(Hamby173|Hamby252)-([0-9]{0,2}|Unknown)-([1-2A-Z])-([1-6])", "\\2", Bullet1))
+comparisons <- comparisons %>% 
+  mutate(BulletA = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Bullet2))
+comparisons <- comparisons %>% 
+  mutate(BulletB = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\3", Bullet1))
+comparisons <- comparisons %>% 
+  mutate(LandA = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\4", Bullet2))
+comparisons <- comparisons %>% 
+  mutate(LandB = gsub("(Hamby173|Hamby252)-([0-9]{1,2}|Unknown)-([1-2A-Z])-([1-6])", "\\4", Bullet1))
+head(comparisons, 500)
+```
