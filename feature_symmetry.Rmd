@@ -1,0 +1,275 @@
+---
+title: "Symmetry of Features"
+author: "Susan Vanderplas"
+date: "7/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rgl::setupKnitr()
+library(x3ptools)
+library(bulletxtrctr)
+library(tidyverse)
+library(digest)
+library(furrr)
+data_dir <- "/media/Raven/REU_Refit/"
+
+plan(multicore)
+```
+
+```{r get-x3ps}
+data <- list.files(data_dir, pattern = "*.x3p", full.names = T, recursive = T) %>%
+  tibble(path = .) %>%
+  mutate(tmpdir = purrr::map_chr(path, ~file.path("/tmp", digest(., "md5")))) %>%
+  mutate(x3p = furrr::future_map2(path, tmpdir, ~read_x3p(file = .x, tmpdir = .y))) 
+
+data <- data %>%
+  mutate(Study = str_extract(path, "Hamby_\\d{3}"),
+         Barrel = str_extract(path, "Barrel\\d{1,}|Unknown"),
+         Barrel = ifelse(Barrel == "Unknown",
+                         "Unknown", 
+                         str_replace_all(Barrel, "Barrel(\\d{1,})", "0\\1") %>%
+                           str_sub(start = -2, end = -1)),
+         Bullet = str_extract(path, "Bullet.") %>% str_remove("Bullet"),
+         Land = str_extract(path, "\\d\\.x3p$") %>% str_remove("\\.x3p"))
+
+rotate_by_study <- function(x3p, study) {
+  if (study == "Hamby_173") {
+    x3p_rotate(x3p, 180)
+  } else if (study == "Hamby_252") {
+    x3p_rotate(x3p, 90)
+  } else {
+    x3p
+  }
+}
+
+data <- data %>%
+  mutate(x3p = furrr::future_map2(x3p, Study, rotate_by_study))
+```
+
+```{r flip-x3ps, dev="png", dpi = 300, fig.width = 8, fig.height = 4}
+data <- bind_rows(
+  data %>% mutate(slant = "left"),
+  data %>% mutate(x3p = furrr::future_map(x3p, ~x3p_rotate(., 180) %>% x3p_flip_y()), 
+                  slant = "right") 
+) %>%
+  mutate(id = paste(Study, Barrel, Bullet, Land, sep = "-"))
+
+image_x3p(data$x3p[[1]])
+image_x3p(data$x3p[[421]])
+image_x3p(data$x3p[[420]])
+image_x3p(data$x3p[[840]])
+```
+
+```{r crosscut-optimize}
+data <- data %>%
+  mutate(x3p = furrr::future_map(x3p, ~x3p_scale_unit(., scale_by = 1e6))) %>%
+  mutate(crosscut = furrr::future_map_dbl(x3p, x3p_crosscut_optimize))
+
+crosscut_diffs <- data %>%
+  select(Study, Barrel, Bullet, Land, slant, crosscut) %>%
+  spread(key = slant, value = crosscut)
+
+filter(crosscut_diffs, left != right)
+```
+Hamby_252-02-2-2 has a different crosscut with a left slant than with a right slant.
+
+```{r extract-crosscut}
+plan(multicore, workers = 12) # mem overflow if all 48 cores are used...
+data <- data %>%
+  mutate(crosscut_data = furrr::future_map2(x3p, crosscut, ~x3p_crosscut(.x, .y))) %>%
+  mutate(crosscut_centered = furrr::future_map(crosscut_data, ~mutate(., x = x - median(x))))
+
+crosscuts <- data %>%
+  select(Study, Barrel, Bullet, Land, slant, crosscut_data) %>%
+  spread(key = slant, value = crosscut_data) %>%
+  mutate(match = furrr::future_map2_chr(left, right, function(x, y){
+    if (unique(x$y) != unique(y$y)) {
+      "cc_level_mismatch"
+    } else if (sum(abs(rev(x$value) - y$value)) > 1e-6) {
+      "cc_value_mismatch"
+    } else {
+      "match"
+    }
+  }))
+table(crosscuts$match)
+```
+So only the one bullet for which a different crosscut was identified did not match. 
+
+```{r get-grooves-interactive, eval=FALSE, include=F}
+library(shiny)
+if (file.exists(saved_grooves_location)) {
+  data$Grooves <- readRDS(saved_grooves_location)
+} else {
+  data$Grooves <- furrr::future_map(data$crosscut_data, ~cc_locate_grooves(., method = "rollapply", smoothfactor = 15, return_plot = T))
+}
+saved_grooves_location <- "Grooves-Slant-Symmetry.rda"
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(data$Grooves)) %>% set_names(data$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- data$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", data$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", data$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(data$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(data$Grooves)) %>% set_names(data$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(data$Grooves, file = saved_grooves_location)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- data$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          data$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          data$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- data$Grooves[[k]]$plot +
+            geom_vline(xintercept = data$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = data$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(data$Grooves, file = saved_grooves_location)
+} else {
+  if (!file.exists(saved_grooves_location)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    data$Grooves <- readRDS(saved_grooves_location)
+  }
+}
+```
+
+```{r get-rollapply-grooves}
+plan(multicore, workers = 24)
+data <- data %>%
+  mutate(rollapply_grooves = furrr::future_map(crosscut_centered, ~cc_locate_grooves(., method = "rollapply", smoothfactor = 15, return_plot = F)),
+         groove_dist = furrr::future_map_dbl(rollapply_grooves, ~diff(.$groove)))
+
+grooves <- data %>%
+  select(Study, Barrel, Bullet, Land, slant, groove_dist) %>%
+  spread(key = slant, value = groove_dist)
+filter(grooves, left != right)
+
+grooves <- data %>%
+  select(Study, Barrel, Bullet, Land, slant, rollapply_grooves) %>%
+  spread(key = slant, value = rollapply_grooves) %>%
+  unnest() %>%
+  mutate(leftslant_leftgroove = furrr::future_map_dbl(left, ~.[1]),
+         leftslant_rightgroove = furrr::future_map_dbl(left, ~.[2]),
+         rightslant_leftgroove = furrr::future_map_dbl(right, ~.[1]),
+         rightslant_rightgroove = furrr::future_map_dbl(right, ~.[2])) %>%
+  select(-left, -right)
+
+grooves %>% 
+  filter((leftslant_leftgroove != -rightslant_rightgroove) | 
+           (leftslant_rightgroove != -rightslant_leftgroove))
+```
+This is the same scan that had slightly different crosscut, so the difference is reasonable.
+
+```{r extract_sig}
+data <- data %>% 
+  mutate(sig = furrr::future_map2(crosscut_centered, rollapply_grooves, cc_get_signature))
+
+sigs <- data %>%
+  select(Study, Barrel, Bullet, Land, slant, sig) %>%
+  spread(key = slant, value = sig) %>%
+  mutate(stats = future_map2(left, right, function(xx, yy) {
+    xx <- xx %>% select(x, sig_left = sig)
+    yy <- yy %>% select(x, sig_right = sig) %>%
+      mutate(x = -x)
+    df <- left_join(xx, yy, by = "x") %>%
+      mutate(err = sig_left - sig_right)
+    sse <- sum(df$err^2, na.rm = T)
+    tibble(
+      SSE = sse,
+      df = list(df)
+    )
+  })) 
+
+sigs <- sigs %>%
+  unnest(stats)
+
+errs <- sigs %>%
+  select(Study, Barrel, Bullet, Land, df) %>%
+  unnest()
+
+ggplot(sigs, aes(x = SSE)) + geom_histogram(bins = 100) + ggtitle("Signature SSE between left-slant and right-slant scans")
+ggplot(errs, aes(x = x, y = err, group = interaction(Study, Barrel, Bullet, Land))) + geom_line(alpha = .05) + 
+  ggtitle("Difference between left-slant and right-slant signatures") + 
+  ylab(expression(paste(symbol("m"), "m")))
+```
+
+```{r alignment}
+plan(multicore, workers = 12)
+align_data <- data %>%
+  select(Study:slant, sig) %>%
+  mutate(sig_full = furrr::future_map(sig, "sig")) %>%
+  mutate(sig_rev = furrr::future_map(sig_full, rev)) %>%
+  mutate(sig_test = ifelse(slant == "right", sig_rev, sig_full)) %>%
+  select(-sig_full, -sig_rev) %>%
+  mutate(id = paste(Study, Barrel, Bullet, Land, slant, sep = "-")) %>%
+  crossing(., .) %>%
+  filter(Study1 == Study, slant1 == slant) %>%
+  select(-Study1, -slant1) 
+
+align_data <- align_data %>% 
+  mutate(align = furrr::future_map2(sig_test, sig_test1, sig_align))
+
+
+save(data, align_data, file = "Symmetry_data.Rdata")
+
+lags <- align_data %>%
+  select(Study:slant, Study1:slant1, align) %>%
+  mutate(lag = furrr::future_map_dbl(align, "lag"))
+
+
+lags %>%
+  select(Study, slant, Barrel:Land, Barrel1:Land1, lag) %>%
+  spread(key = slant, value = lag) %>%
+  filter(abs(right) != abs(left))
+lags %>%
+  select(Study, slant, Barrel:Land, Barrel1:Land1, lag) %>%
+  spread(key = slant, value = lag) %>%
+  filter(abs(right) == abs(left))
+
+```
