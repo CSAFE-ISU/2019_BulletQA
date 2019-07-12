@@ -259,7 +259,7 @@ align_data <- align_data %>%
 save(data, align_data, file = "Symmetry_data.Rdata")
 
 lags <- align_data %>%
-  select(Study:slant, Study1:slant1, align) %>%
+  select(Study:slant, Barrel1:Land1, align) %>%
   mutate(lag = furrr::future_map_dbl(align, "lag"))
 
 
