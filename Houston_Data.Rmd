@@ -1,0 +1,1248 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#Loading Packages
+#Will most likely add more
+library(dplyr)
+library(bulletxtrctr)
+library(x3ptools)
+library(randomForest)
+library(ggplot2)
+library(readr)
+library(furrr)
+library(purrr)
+library(stringr)
+library(dichromat) 
+library(future)
+library(gridExtra)
+library(tidyr)
+options(future.globals.maxSize = 12*1024*1024*1024)
+```
+
+```{r}
+Group1 <- tibble(path = list.files(path = "/media/Sunny/CSAFE/Houston Set Rescan/Group 1",
+                 pattern = ".dat", recursive = T,
+                 full.names = T)) %>%
+  mutate(Barrel = str_extract(path, "(Unknowns|K[A-Z])\\d{0,2}"),
+         Bullet = str_extract(path, "(Bullet [123A-Z]|U[0-9][0-9])") %>% 
+                              str_remove("Bullet"),
+         Land = str_extract(path, "Land [0-9]") %>%
+                              str_remove("Land")) %>%
+  mutate(Set = "Group_1") %>% 
+  mutate(dat = future_map(path, x3p_read_dat))
+
+
+Group2 <- tibble(path = list.files(path = "/media/Sunny/CSAFE/Houston Set Rescan/Group 2",
+                 pattern = ".dat", recursive = T,
+                 full.names = T)) %>%
+  mutate(Barrel = str_extract(path, "(Unknowns|K[A-Z])\\d{0,2}"),
+         Bullet = str_extract(path, "(Bullet [123A-Z]|U[0-9][0-9])") %>% 
+                              str_remove("Bullet"),
+         Land = str_extract(path, "Land [0-9]") %>%
+                              str_remove("Land")) %>%
+  mutate(Set = "Group_2") %>% 
+  mutate(dat = future_map(path, x3p_read_dat))
+
+
+Group3 <- tibble(path = list.files(path = "/media/Sunny/CSAFE/Houston Set Rescan/Group 3",
+                 pattern = ".dat", recursive = T,
+                 full.names = T)) %>%
+  mutate(Barrel = str_extract(path, "(Unknowns|K[A-Z])\\d{0,2}"),
+         Bullet = str_extract(path, "(Bullet [123A-Z]|U[0-9][0-9])") %>% 
+                              str_remove("Bullet"),
+          Land = str_extract(path, "Land [0-9]") %>%
+                              str_remove("Land")) %>% 
+  mutate(Set = "Group_3") %>% 
+  mutate(dat = future_map(path, x3p_read_dat))
+
+
+
+
+Group1 <- Group1 %>% mutate(
+  dat = dat %>% future_map(.f = function(x) x %>% 
+                             y_flip_x3p()))
+
+Group2 <- Group2 %>% mutate(
+  dat = dat %>% future_map(.f = function(x) x %>% 
+                             y_flip_x3p()))
+
+Group3 <- Group3 %>% mutate(
+  dat = dat %>% future_map(.f = function(x) x %>% 
+                             y_flip_x3p()))
+ 
+```
+
+```{r}
+
+
+Group1 <- Group1 %>% 
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Set, Barrel, Bullet, Land, dat, path) %>% 
+  rename(x3p = dat)
+
+Group2 <- Group2 %>% 
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Set, Barrel, Bullet, Land, dat, path) %>% 
+  rename(x3p = dat)
+
+Group3 <- Group3 %>% 
+  mutate(id = paste(Set, Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Set, Barrel, Bullet, Land, dat, path) %>% 
+  rename(x3p = dat)
+
+
+```
+
+```{r}
+
+Group1_Barrel_KA <- Group1 %>%
+  filter(id %in% c("Group_1-KA- 1- 1", "Group_1-KA- 1- 2", "Group_1-KA- 1- 4", "Group_1-KA- 2- 1", "Group_1-KA- 2- 3", "Group_1-KA- 2- 5", "Group_1-KA- 2- 6", "Group_1-KA- 3- 1", "Group_1-KA- 3- 3", "Group_1-KA- 3- 4"))
+
+Group1_Barrel_KB <- Group1 %>% 
+  filter(id %in% c("Group_1-KB- 1- 2", "Group_1-KB- 1- 4", "Group_1-KB- 1- 6", "Group_1-KB- 2- 4", "Group_1-KB- 3- 1", "Group_1-KB- 3- 2"))
+
+
+Group1_Barrel_KC <- Group1 %>% 
+  filter(id %in% c("Group_1-KC- 1- 1", "Group_1-KC- 2- 3", "Group_1-KC- 2- 4", "Group_1-KC- 2- 5"))
+
+Group1_Barrel_KD <- Group1 %>%
+  filter(id %in% c("Group_1-KD- 1- 3", "Group_1-KD- 1- 4", "Group_1-KD- 2- 5", "Group_1-KD- 3- 1", "Group_1-KD- 3- 4"))
+
+Group1_Barrel_KE <- Group1 %>% 
+  filter(id %in% c("Group_1-KE- 2- 4"))
+
+Group1_Barrel_Unknons <- Group1 %>%
+  filter(Barrel == "Unknowns") 
+
+#"Group_1-Unknowns-U37- 6", "Group_1-Unknowns-U42- 6", "Group_1-Unknowns-U77- 6", "Group_3-KJ- 3- 6"
+
+
+Group1 <- Group1 %>%
+  filter(!id %in% c("Group_1-KA- 1- 1", "Group_1-KA- 1- 2", "Group_1-KA- 1- 4", "Group_1-KA- 2- 1", "Group_1-KA- 2- 3", "Group_1-KA- 2- 5", "Group_1-KA- 2- 6", "Group_1-KA- 3- 1", "Group_1-KA- 3- 3", "Group_1-KA- 3- 4", "Group_1-KB- 1- 2", "Group_1-KB- 1- 4", "Group_1-KB- 1- 6", "Group_1-KB- 2- 4", "Group_1-KB- 3- 1", "Group_1-KB- 3- 2", "Group_1-KC- 1- 1", "Group_1-KC- 2- 3", "Group_1-KC- 2- 4", "Group_1-KC- 2- 5", "Group_1-KD- 1- 4", "Group_1-KD- 1- 3", "Group_1-KD- 2- 5", "Group_1-KD- 3- 1", "Group_1-KD- 3- 4", "Group_1-KE- 2- 4")) %>%
+  filter(Barrel != "Unknowns")
+
+
+
+plan(multicore) # use all the cores at once
+
+#safe_crosscut <- safely(x3p_crosscut_optimize)
+
+Group1 <- Group1 %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(150 ,NA)))
+
+Group1_Barrel_KA <- Group1_Barrel_KA %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(350, NA)))
+
+Group1_Barrel_KB <- Group1_Barrel_KB %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group1_Barrel_KC <- Group1_Barrel_KC %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group1_Barrel_KD <- Group1_Barrel_KD %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group1_Barrel_KE <- Group1_Barrel_KE %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group1_Barrel_Unknons <- Group1_Barrel_Unknons %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(250, NA)))
+
+
+Group1 <- bind_rows(Group1, Group1_Barrel_KA, Group1_Barrel_KB, Group1_Barrel_KC, Group1_Barrel_KD, Group1_Barrel_KE, Group1_Barrel_Unknons)
+
+```
+
+```{r}
+Group2_Barrel_KC <- Group2 %>%
+  filter(id %in% c("Group_2-KC- 1- 3", "Group_2-KC- 1- 4", "Group_2-KC- 2- 2", "Group_2-KC- 2- 5", "Group_2-KC- 2- 6", "Group_2-KC- 3- 2", "Group_2-KC- 3- 6"))
+
+Group2_Barrel_KD <- Group2 %>% 
+  filter(id %in% c("Group_2-KD- 1- 1", "Group_2-KD- 1- 2", "Group_2-KD- 1- 3", "Group_2-KD- 1- 4", "Group_2-KD- 3- 2", "Group_2-KD- 3- 3", "Group_2-KD- 3- 4", "Group_2-KD- 3- 5"))
+
+Group2_Barrel_KE <- Group2 %>% 
+  filter(id %in% c("Group_2-KE- 1- 3", "Group_2-KE- 1- 5", "Group_2-KE- 2- 2", "Group_2-KE- 2- 3", "Group_2-KE- 3- 2", "Group_2-KE- 3- 5"))
+
+Group2_Barrel_KF <- Group2 %>% 
+  filter(id %in% c("Group_2-KF- 1- 2", "Group_2-KF- 2- 1", "Group_2-KF- 2- 3", "Group_2-KF- 2- 5", "Group_2-KF- 2- 6", "Group_2-KF- 3- 3"))
+
+Group2_Barrel_KG <- Group2 %>%
+  filter(id %in% c("Group_2-KG- 1- 1", "Group_2-KG- 1- 5", "Group_2-KG- 1- 6", "Group_2-KG- 2- 3", "Group_2-KG- 2- 4", "Group_2-KG- 3- 3"))
+
+Group2_Barrel_Unknowns <- Group2 %>%
+  filter(id %in% c("Group_2-Unknowns-U23- 1", "Group_2-Unknowns-U23- 3", "Group_2-Unknowns-U23- 6", "Group_2-Unknowns-U41- 1", "Group_2-Unknowns-U41- 2", "Group_2-Unknowns-U61- 4", "Group_2-Unknowns-U63- 2", "Group_2-Unknowns-U63- 4", "Group_2-Unknowns-U66- 2", "Group_2-Unknowns-U66- 5", "Group_2-Unknowns-U73- 2", "Group_2-Unknowns-U73- 5", "Group_2-Unknowns-U98- 4", "Group_2-Unknowns-U98- 6"))
+
+Group2 <- Group2 %>%
+  filter(!id %in% c("Group_2-KC- 1- 3", "Group_2-KC- 1- 4", "Group_2-KC- 2- 2", "Group_2-KC- 2- 5", "Group_2-KC- 2- 6", "Group_2-KC- 3- 2", "Group_2-KC- 3- 6", "Group_2-KD- 1- 1", "Group_2-KD- 1- 2", "Group_2-KD- 1- 3", "Group_2-KD- 1- 4", "Group_2-KD- 3- 2", "Group_2-KD- 3- 3", "Group_2-KD- 3- 4", "Group_2-KD- 3- 5", "Group_2-KE- 1- 3", "Group_2-KE- 1- 5", "Group_2-KE- 2- 2", "Group_2-KE- 2- 3", "Group_2-KE- 3- 2", "Group_2-KE- 3- 5", "Group_2-KF- 1- 2", "Group_2-KF- 2- 1", "Group_2-KF- 2- 3", "Group_2-KF- 2- 5", "Group_2-KF- 2- 6", "Group_2-KF- 3- 3", "Group_2-KG- 1- 1", "Group_2-KG- 1- 5", "Group_2-KG- 1- 6", "Group_2-KG- 2- 3", "Group_2-KG- 2- 4", "Group_2-KG- 3- 3", "Group_2-Unknowns-U23- 1", "Group_2-Unknowns-U23- 3", "Group_2-Unknowns-U23- 6", "Group_2-Unknowns-U41- 1", "Group_2-Unknowns-U41- 2", "Group_2-Unknowns-U61- 4", "Group_2-Unknowns-U63- 2", "Group_2-Unknowns-U63- 4", "Group_2-Unknowns-U66- 2", "Group_2-Unknowns-U66- 5", "Group_2-Unknowns-U73- 2", "Group_2-Unknowns-U73- 5", "Group_2-Unknowns-U98- 4", "Group_2-Unknowns-U98- 6"))
+
+
+
+Group2 <- Group2 %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize))
+
+Group2_Barrel_KC <- Group2_Barrel_KC %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group2_Barrel_KD <- Group2_Barrel_KD %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group2_Barrel_KE <- Group2_Barrel_KE %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group2_Barrel_KF <- Group2_Barrel_KF %>% 
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(300, NA)))
+
+Group2_Barrel_KG <- Group2_Barrel_KG %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(350, NA)))
+
+Group2_Barrel_Unknowns <- Group2_Barrel_Unknowns %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimits = c(350, NA)))
+
+Group2 <- bind_rows(Group2, Group2_Barrel_KC, Group2_Barrel_KD, Group2_Barrel_KE, Group2_Barrel_KF, Group2_Barrel_KG, Group2_Barrel_Unknowns)
+
+
+```
+
+```{r}
+
+
+
+
+Group3 <- Group3 %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, ylimit = c(250, NA)))
+
+
+
+```
+
+```{r}
+
+Group3 %>% 
+  filter(Barrel != "Unknowns") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+        scale_fill_brewer()+
+          ggtitle("Barrels 1-10 173")
+
+Group3 %>% 
+  filter(Barrel == "Unknowns") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+        scale_fill_brewer(palette = "dark")+
+          ggtitle("Barrels 1-10 173")
+
+```
+
+```{r}
+
+Group1 <- Group1 %>% 
+  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
+
+Houston_CrossCuts_1 <- select(Group1, -path, -x3p) %>% 
+      tidyr::unnest(CrossCut)
+
+
+
+```
+
+```{r}
+Group2 <- Group2 %>% 
+  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
+Houston_CrossCuts_2 <- select(Group2, -path, -x3p) %>%
+  tidyr::unnest(CrossCut)
+
+
+```
+
+```{r}
+Group3 <- Group3 %>% 
+  mutate(CrossCut = future_map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
+Houston_CrossCuts_3 <- select(Group3, -path, -x3p) %>%
+  tidyr::unnest(CrossCut)
+
+```
+
+
+```{r}
+
+Houston_CrossCuts_1 %>%
+  filter(Barrel != "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+Houston_CrossCuts_1 %>%
+  filter(Barrel == "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_wrap(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+
+Houston_CrossCuts_2 %>%
+  filter(Barrel != "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+Houston_CrossCuts_2 %>%
+  filter(Barrel == "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_wrap(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+
+Houston_CrossCuts_3 %>%
+  filter(Barrel != "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+Houston_CrossCuts_3 %>%
+  filter(Barrel == "Unknowns") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_wrap(Set + paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+
+Houston_CrossCuts_3 %>%
+  filter(Barrel == "KJ") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_wrap(~Bullet+Land, ncol = 6)
+```
+
+```{r}
+
+#checking for possible better regions for crosscut scans
+head(Group1, 138)
+head(Group2, 138)
+head(Group3, 138)
+
+
+```
+
+```{r}
+
+Group3$x3p[[55]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[56]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[57]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[58]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[59]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[60]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[61]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[62]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[63]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[64]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[65]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[66]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[67]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[68]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[69]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[70]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[71]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Group3$x3p[[72]]$surface.matrix %>% imager::as.cimg() %>% plot()
+
+```
+
+```{r}
+# Grooves 
+
+saved_grooves_location_Houston_1 <- "Group1data.rda"
+if (file.exists(saved_grooves_location_Houston_1)) {
+  Group1$Grooves <- readRDS(saved_grooves_location_Houston_1)
+} else {
+  Group1 <- Group1 %>% 
+    mutate(Grooves = CrossCut %>% 
+             future_map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
+
+grooves_Group1 <- Group1 %>% tidyr::unnest(Grooves)
+
+```
+
+
+```{r}
+# Grooves 
+
+saved_grooves_location_Houston_2 <- "Group2data.rda"
+if (file.exists(saved_grooves_location_Houston_2)) {
+  Group2$Grooves <- readRDS(saved_grooves_location_Houston_2)
+} else {
+  Group2 <- Group2 %>% 
+    mutate(Grooves = CrossCut %>% 
+             future_map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
+
+grooves_Group2 <- Group2 %>% tidyr::unnest(Grooves)
+
+```
+
+```{r}
+
+saved_grooves_location_Houston_3 <- "Group3data.rda"
+if (file.exists(saved_grooves_location_Houston_3)) {
+  Group3$Grooves <- readRDS(saved_grooves_location_Houston_3)
+} else {
+  Group3 <- Group3 %>% 
+    mutate(Grooves = CrossCut %>% 
+             future_map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
+
+grooves_Group3 <- Group3 %>% tidyr::unnest(Grooves)
+
+
+```
+
+### Shiny app 
+```{r}
+library(shiny)
+if (file.exists(saved_grooves_location_Houston_1)) {
+  Group1$Grooves <- readRDS(saved_grooves_location_Houston_1)
+}
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(Group1$Grooves)) %>% set_names(Group1$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- Group1$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", Group1$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", Group1$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(Group1$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(Group1$Grooves)) %>% set_names(Group1$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(Group1$Grooves, file = saved_grooves_location_Houston_1)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- Group1$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          Group1$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          Group1$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- Group1$Grooves[[k]]$plot +
+            geom_vline(xintercept = Group1$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = Group1$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(Group1$Grooves, file = saved_grooves_location_Houston_1)
+} else {
+  if (!file.exists(saved_grooves_location_Houston_1)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    Group1$Grooves <- readRDS(saved_grooves_location_Houston_1)
+  }
+}
+
+
+```
+
+```{r}
+library(shiny)
+if (file.exists(saved_grooves_location_Houston_2)) {
+  Group2$Grooves <- readRDS(saved_grooves_location_Houston_2)
+}
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(Group2$Grooves)) %>% set_names(Group2$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- Group2$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", Group2$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", Group2$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(Group2$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(Group2$Grooves)) %>% set_names(Group2$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(Group2$Grooves, file = saved_grooves_location_Houston_2)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- Group2$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          Group2$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          Group2$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- Group2$Grooves[[k]]$plot +
+            geom_vline(xintercept = Group2$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = Group2$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(Group2$Grooves, file = saved_grooves_location_Houston_2)
+} else {
+  if (!file.exists(saved_grooves_location_Houston_2)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    Group2$Grooves <- readRDS(saved_grooves_location_Houston_2)
+  }
+}
+
+
+```
+
+```{r}
+
+library(shiny)
+if (file.exists(saved_grooves_location_Houston_3)) {
+  Group3$Grooves <- readRDS(saved_grooves_location_Houston_3)
+}
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(Group3$Grooves)) %>% set_names(Group3$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- Group3$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", Group3$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", Group3$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(Group3$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(Group3$Grooves)) %>% set_names(Group3$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(Group3$Grooves, file = saved_grooves_location_Houston_3)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- Group3$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          Group3$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          Group3$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- Group3$Grooves[[k]]$plot +
+            geom_vline(xintercept = Group3$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = Group3$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(Group3$Grooves, file = saved_grooves_location_Houston_3)
+} else {
+  if (!file.exists(saved_grooves_location_Houston_3)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    Group3$Grooves <- readRDS(saved_grooves_location_Houston_3)
+  }
+}
+
+
+```
+
+```{r}
+
+Group1 <- Group1 %>% 
+ mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03))
+
+ Signatures_Group1 <- Group1 %>% 
+  select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
+   tidyr::unnest()
+
+Signatures_Group1 %>%
+  filter(Barrel != "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_grid(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels 1-10 173")
+
+Signatures_Group1 %>%
+  filter(Barrel == "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels Unknown")
+
+```
+
+```{r}
+Group2 <- Group2 %>% 
+ mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03))
+
+ Signatures_Group2 <- Group2 %>% 
+  select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
+   tidyr::unnest()
+
+Signatures_Group2 %>%
+  filter(Barrel != "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_grid(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels 1-10 173")
+
+Signatures_Group2 %>%
+  filter(Barrel == "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels Unknown")
+
+```
+
+```{r}
+
+Group3 <- Group3 %>% 
+ mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03))
+
+ Signatures_Group3 <- Group3 %>% 
+  select(id, Set, Barrel, Bullet, Land, Signatures) %>% 
+   tidyr::unnest()
+
+Signatures_Group3 %>%
+  filter(Barrel != "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_grid(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels 1-10 173")
+
+Signatures_Group3 %>%
+  filter(Barrel == "Unknowns") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels Unknown")
+
+```
+
+```{r}
+
+comparisons_1 <- crossing(Bullet1 = Group1$id, Bullet2 = Group1$id) %>%
+  left_join(nest(Group1, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(Group1, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
+  mutate(Set1 = str_extract(Bullet1, "Group_\\d{1}"),
+         Set2 = str_extract(Bullet2, "Group_\\d{1}")) %>%
+  filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
+  select(-matches("Set"))
+  
+comparisons_2 <- crossing(Bullet1 = Group2$id, Bullet2 = Group2$id) %>%
+  left_join(nest(Group2, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(Group2, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
+  mutate(Set1 = str_extract(Bullet1, "Group_\\d{1}"),
+         Set2 = str_extract(Bullet2, "Group_\\d{1}")) %>%
+  filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
+  select(-matches("Set"))
+
+comparisons_3 <- crossing(Bullet1 = Group3$id, Bullet2 = Group3$id) %>%
+  left_join(nest(Group3, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(Group3, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data"))) %>%
+  mutate(Set1 = str_extract(Bullet1, "Group_\\d{1}"),
+         Set2 = str_extract(Bullet2, "Group_\\d{1}")) %>%
+  filter(Set1 == Set2) %>% # Get rid of cross-set comparisons for now...
+  select(-matches("Set"))
+
+```
+
+```{r}
+#plan(multicore(workers = availableCores(constraints = 8)))
+
+plan(multicore)
+
+get_sig <- function(data) {
+  map(data$Signatures, "sig")
+}
+comparisons_1 <- comparisons_1 %>%
+  mutate(sig1 = future_map(Bullet1_data, get_sig), sig2 = future_map(Bullet2_data, get_sig))
+
+comparisons_1 <- comparisons_1 %>%
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+# Get striae
+
+comparisons_1 <- comparisons_1 %>%
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
+saveRDS(select(comparisons_1, -Bullet1_data, -Bullet2_data), file = "Group1_Comparisons.rda")
+
+
+
+
+
+
+comparisons_1 <- comparisons_1 %>% 
+  select(-Bullet1_data, -Bullet2_data)
+
+comparisons_1 <- comparisons_1 %>% 
+  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625))#ObtainingFeatures
+
+comparisons_1 <- comparisons_1 %>% 
+  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+
+comparisons_legacy_1 <- comparisons_1 %>% 
+  select(-features) %>%
+  tidyr::unnest(Legacy_Features) # Extracting feature legacy
+
+comparisons_1 <- comparisons_1 %>%
+  select(-Legacy_Features) %>%
+  tidyr::unnest(features)
+
+
+#plan(multicore(workers = availableCores(constraints = 8)))
+
+plan(multicore)
+
+get_sig <- function(data) {
+  map(data$Signatures, "sig")
+}
+comparisons_2 <- comparisons_2 %>%
+  mutate(sig1 = future_map(Bullet1_data, get_sig), sig2 = future_map(Bullet2_data, get_sig))
+
+comparisons_2 <- comparisons_2 %>%
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+# Get striae
+
+comparisons_2 <- comparisons_2 %>%
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
+saveRDS(select(comparisons_2, -Bullet1_data, -Bullet2_data), file = "Group2_Comparisons.rda")
+
+
+
+
+
+
+comparisons_2 <- comparisons_2 %>% 
+  select(-Bullet1_data, -Bullet2_data)
+
+comparisons_2 <- comparisons_2 %>% 
+  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625))#ObtainingFeatures
+
+comparisons_2 <- comparisons_2 %>% 
+  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+
+comparisons_legacy_2 <- comparisons_2 %>% 
+  select(-features) %>%
+  tidyr::unnest(Legacy_Features) # Extracting feature legacy
+
+comparisons_2 <- comparisons_2 %>%
+  select(-Legacy_Features) %>%
+  tidyr::unnest(features)
+
+
+
+
+
+plan(multicore)
+
+get_sig <- function(data) {
+  map(data$Signatures, "sig")
+}
+comparisons_3 <- comparisons_3 %>%
+  mutate(sig1 = future_map(Bullet1_data, get_sig), sig2 = future_map(Bullet2_data, get_sig))
+
+comparisons_3 <- comparisons_3 %>%
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+# Get striae
+
+comparisons_3 <- comparisons_3 %>%
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
+saveRDS(select(comparisons_3, -Bullet1_data, -Bullet2_data), file = "Group3_Comparisons.rda")
+
+
+
+
+
+
+comparisons_3 <- comparisons_3 %>% 
+  select(-Bullet1_data, -Bullet2_data)
+
+comparisons_3 <- comparisons_3 %>% 
+  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625))#ObtainingFeatures
+
+comparisons_3 <- comparisons_3 %>% 
+  mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+
+comparisons_legacy_3 <- comparisons_3 %>% 
+  select(-features) %>%
+  tidyr::unnest(Legacy_Features) # Extracting feature legacy
+
+comparisons_3 <- comparisons_3 %>%
+  #select(-Legacy_Features) %>%
+  tidyr::unnest(features)
+
+head(comparisons_1)
+```
+
+
+```{r}
+
+comparisons_1 <- comparisons_1 %>%
+  select(-sig1, -sig2, -Aligned, -Striae, - right_cms, -left_cms)
+
+comparisons_1 <- comparisons_1 %>%
+  mutate(Bullet1 = gsub(" ", "", fixed = TRUE, Bullet1), Bullet2 = gsub(" ", "", fixed = TRUE, Bullet2))
+
+comparisons_1 <- comparisons_1 %>% 
+  mutate(Set = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\1", Bullet2))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(BarrelA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet2))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(BarrelB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet1))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(BulletA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet2))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(BulletB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet1))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(LandA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet2))
+comparisons_1 <- comparisons_1 %>% 
+  mutate(LandB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet1))
+
+```
+
+```{r}
+comparisons_2 <- comparisons_2 %>%
+  select(-sig1, -sig2, -Aligned, -Striae, - right_cms, -left_cms)
+
+comparisons_2 <- comparisons_2 %>%
+  mutate(Bullet1 = gsub(" ", "", fixed = TRUE, Bullet1), Bullet2 = gsub(" ", "", fixed = TRUE, Bullet2))
+
+comparisons_2 <- comparisons_2 %>% 
+  mutate(Set = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\1", Bullet2))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(BarrelA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet2))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(BarrelB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet1))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(BulletA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet2))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(BulletB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet1))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(LandA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet2))
+comparisons_2 <- comparisons_2 %>% 
+  mutate(LandB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet1))
+
+```
+
+```{r}
+comparisons_3 <- comparisons_3 %>%
+  select(-sig1, -sig2, -Aligned, -Striae, - right_cms, -left_cms)
+
+comparisons_3 <- comparisons_3 %>%
+  mutate(Bullet1 = gsub(" ", "", fixed = TRUE, Bullet1), Bullet2 = gsub(" ", "", fixed = TRUE, Bullet2))
+
+comparisons_3 <- comparisons_3 %>% 
+  mutate(Set = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\1", Bullet2))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(BarrelA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet2))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(BarrelB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet1))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(BulletA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet2))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(BulletB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet1))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(LandA = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet2))
+comparisons_3 <- comparisons_3 %>% 
+  mutate(LandB = gsub("(Group_[0-9]{1})-([A-Z]{1,2}|Unknowns)-(U[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\4", Bullet1))
+
+head(comparisons_2)
+
+```
+
+```{r}
+
+comparisons_1 %>% 
+  filter(BarrelA == "KA" & BarrelB == "KA") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+
+comparisons_1 %>% 
+  filter(BarrelA == "KA" & BarrelB == "KC") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+```
+
+```{r}
+comparisons_2 %>% 
+  filter(BarrelA == "KC" & BarrelB == "KC") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+
+comparisons_2 %>% 
+  filter(BarrelA == "KC" & BarrelB == "KD") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+```
+
+```{r}
+comparisons_3 %>% 
+  filter(BarrelA == "KF" & BarrelB == "KF") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+
+comparisons_3 %>% 
+  filter(BarrelA == "KI" & BarrelB == "KJ") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+```
+
+```{r}
+comparisons_1$rfscore <- predict(rtrees, newdata = comparisons_1, type = "prob")[,2]
+comparisons_2$rfscore <- predict(rtrees, newdata = comparisons_2, type = "prob")[,2]
+comparisons_3$rfscore <- predict(rtrees, newdata = comparisons_3, type = "prob")[,2]
+
+```
+
+```{r}
+comparisons_1 %>%
+  filter(BarrelA == "KA" & BarrelB == "KA") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+comparisons_1 %>%
+  filter(BarrelA == "KA" & BarrelB == "KC") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+```
+
+```{r}
+comparisons_2 %>%
+  filter(BarrelA == "KC" & BarrelB == "KC") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+comparisons_2 %>%
+  filter(BarrelA == "KC" & BarrelB == "KD") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+```
+
+```{r}
+comparisons_3 %>%
+  filter(BarrelA == "KI" & BarrelB == "KI") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+comparisons_3 %>%
+  filter(BarrelA == "KI" & BarrelB == "KJ") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+```
+
+# Bullet Scores
+### Currently on hold
+```{r}
+
+Bullet_Scores_1 <- comparisons_1 %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores_1 <- Bullet_Scores_1 %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores_1 %>% 
+  select(-data) %>% 
+    arrange(desc(Bullet_Score))
+
+Bullet_Scores_1 <- Bullet_Scores_1 %>% 
+  mutate(data = data %>% 
+           future_map(.f = function(d){
+              d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores_1 %>% 
+  tidyr::unnest(data) 
+
+```
+
+```{r}
+
+Bullet_Scores_2 <- comparisons_2 %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores_2 <- Bullet_Scores_2 %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores_2 %>% 
+  select(-data) %>% 
+    arrange(desc(Bullet_Score))
+
+Bullet_Scores_2 <- Bullet_Scores_2 %>% 
+  mutate(data = data %>% 
+           future_map(.f = function(d){
+              d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores_2 %>% 
+  tidyr::unnest(data) 
+
+```
+
+```{r}
+
+Bullet_Scores_3 <- comparisons_3 %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores_3 <- Bullet_Scores_3 %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores_3 %>% 
+  select(-data) %>% 
+    arrange(desc(Bullet_Score))
+
+Bullet_Scores_3 <- Bullet_Scores_3 %>% 
+  mutate(data = data %>% 
+           future_map(.f = function(d){
+              d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+Bullet_Scores_3 %>% 
+  tidyr::unnest(data) 
+```
+
+```{r}
+Bullet_Scores_Examin_1 <- Bullet_Scores_1 %>% 
+  tidyr::unnest(data)
+
+#Bullet_Scores_Examin_1
+
+
+Bullet_Scores_Examin_2 <- Bullet_Scores_2 %>% 
+  tidyr::unnest(data)
+
+#Bullet_Scores_Examin_2
+
+
+Bullet_Scores_Examin_3 <- Bullet_Scores_3 %>% 
+  tidyr::unnest(data)
+
+#Bullet_Scores_Examin_3
+```
+
+```{r}
+
+ggplot(subset(Bullet_Scores_Examin_1, !BulletB %in% c("1", "2", "3")))+
+      geom_tile(aes(x = BulletA, y = BulletB, fill = rfscore))+
+        scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BarrelB~BarrelA, labeller = "label_both", scales = "free")
+
+
+ggplot(subset(Bullet_Scores_Examin_2, !BulletB %in% c("1", "2", "3")))+
+      geom_tile(aes(x = BulletA, y = BulletB, fill = rfscore))+
+        scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BarrelB~BarrelA, labeller = "label_both", scales = "free")
+
+ggplot(subset(Bullet_Scores_Examin_3, !BulletB %in% c("1", "2", "3")))+
+      geom_tile(aes(x = BulletA, y = BulletB, fill = rfscore))+
+        scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BarrelB~BarrelA, labeller = "label_both", scales = "free")
+
+```
+
+
+
+
+
+
+
+
+
+
