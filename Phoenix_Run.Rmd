@@ -1,0 +1,459 @@
+---
+title: "Phoenix Analysis"
+author: "Andrew Maloney"
+date: "8/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#Loading Packages
+#Will most likely add more
+library(dplyr)
+library(bulletxtrctr)
+library(x3ptools)
+library(randomForest)
+library(ggplot2)
+library(readr)
+library(furrr)
+library(purrr)
+library(stringr)
+library(dichromat) 
+library(future)
+library(gridExtra)
+library(tidyr)
+options(future.globals.maxSize = 12*1024*1024*1024)
+```
+
+```{r}
+Phoenix <- tibble(path = list.files(path = "/media/Sunny/CSAFE/Phoenix Set",
+                                    pattern = ".dat", recursive = T, full.names = T)) %>%
+  mutate(Barrel = str_extract(path, "(Unknown|Gun [0-9]-[A-Z][0-9])") %>%
+           str_remove("Gun 1-"),
+         Bullet = str_extract(path, "(B[0-9]|Unknown 1-[A-Z])") %>%
+           str_remove("Unknown 1-"), 
+         Land = str_extract(path, "/L[0-9]") %>% str_remove("/L")) %>%
+  mutate(x3p = map(path, x3p_read_dat))
+
+
+#Phoenix <- na.omit(Phoenix)
+
+
+
+Phoenix$x3p[[1]]$header.info$incrementX
+Phoenix$x3p[[1]]$header.info$incrementY
+
+head(Phoenix, 204)
+
+
+Phoenix <- Phoenix %>% mutate(
+  x3p = x3p %>% purrr::map(.f = function(x) x %>% 
+                             y_flip_x3p()))
+
+Phoenix <- Phoenix %>% mutate(
+  x3p = x3p %>% purrr::map(.f = function(x) x %>% 
+                             rotate_x3p(angle = -90)))
+
+
+Phoneix_RGL_TEST_2 <- Phoenix %>%
+  filter(Barrel != "Unknown") %>%
+  filter(Land == "1")
+
+```
+
+```{r}
+
+Phoenix$x3p[[1]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Phoenix$x3p[[2]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Phoenix$x3p[[3]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Phoenix$x3p[[4]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Phoenix$x3p[[5]]$surface.matrix %>% imager::as.cimg() %>% plot()
+Phoenix$x3p[[20]]$surface.matrix %>% imager::as.cimg() %>% plot()
+
+```
+
+```{r}
+
+Phoenix <- Phoenix %>% 
+  mutate(id = paste(Barrel, Bullet, Land, sep = "-")) %>%
+  select(id, Barrel, Bullet, Land, x3p, path)
+
+
+
+
+```
+
+```{r}
+
+plan(multicore) # use all the cores at once
+
+#safe_crosscut <- safely(x3p_crosscut_optimize)
+
+Phoenix <- Phoenix %>%
+  mutate(CrossSection = future_map_dbl(x3p, x3p_crosscut_optimize, span = 0.03))
+
+head(Phoenix)
+
+```
+
+```{r}
+
+Phoenix %>% 
+  filter(Barrel != "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+          ggtitle("Barrels 1-10")
+
+Phoenix %>% 
+  filter(Barrel == "Unknown") %>% 
+    ggplot(aes(x = Barrel, y = CrossSection, fill = Bullet))+ 
+      geom_boxplot()+
+          ggtitle("Barrel Unknown")
+
+
+
+```
+
+```{r}
+
+Phoenix <- Phoenix %>% 
+  mutate(CrossCut = map2(.x = x3p, .y = CrossSection, .f = x3p_crosscut))
+
+crosscuts_phoenix <- select(Phoenix, -path, -x3p) %>% 
+      tidyr::unnest(CrossCut)
+
+```
+
+```{r}
+
+crosscuts_phoenix %>%
+  filter(Barrel != "Unknown") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_grid(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+crosscuts_phoenix %>%
+  filter(Barrel == "Unknown") %>% 
+    ggplot(data = ., aes(x = x, y = value, color = Land)) + 
+      geom_line() + 
+        facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))
+
+
+
+
+
+```
+
+```{r}
+
+saved_grooves_location_Phoenix <- "Phoenixdata.rda"
+if (file.exists(saved_grooves_location_Phoenix)) {
+  Phoenix$Grooves <- readRDS(saved_grooves_location_Phoenix)
+} else {
+  Phoenix <- Phoenix %>% 
+    mutate(Grooves = CrossCut %>% 
+             future_map(.f = cc_locate_grooves, 
+                        method = "rollapply", smoothfactor = 15, return_plot = T))  # use plot so that the shiny app works...
+}
+
+grooves_Phoenix <- Phoenix %>% tidyr::unnest(Grooves)
+
+
+```
+
+### Shiny app 
+```{r}
+library(shiny)
+if (file.exists(saved_grooves_location_Phoenix)) {
+  Phoenix$Grooves <- readRDS(saved_grooves_location_Phoenix)
+}
+if (interactive()) { # only run when you're manually running chunks... don't run when the whole document is compiled.
+  shinyApp(
+    ui = fluidPage(
+      selectInput("k", "Investigate kth plot:",
+                  selected = 1,
+                  choices = (1:length(Phoenix$Grooves)) %>% set_names(Phoenix$id)
+      ),
+      textOutput("groovelocations"),
+      actionButton("confirm", "Confirm"),
+      actionButton("save", "Save"),
+      plotOutput("groovePlot", click = "plot_click"),
+      verbatimTextOutput("info")
+    ),
+    
+    server = function(input, output, session) {
+      output$groovePlot <- renderPlot({
+        k <- as.numeric(input$k)
+        p <- Phoenix$Grooves[[k]]$plot
+        
+        p
+      })
+      output$groovelocations <- renderText({
+        paste(
+          "Left Groove: ", Phoenix$Grooves[[as.numeric(input$k)]]$groove[1],
+          " Right Groove: ", Phoenix$Grooves[[as.numeric(input$k)]]$groove[2]
+        )
+      })
+      observeEvent(input$confirm, {
+        cat(paste(Phoenix$id[as.numeric(input$k)], "\n"))
+        updateSelectInput(session, "k", "Investigate kth plot:",
+                          selected = as.numeric(input$k) + 1,
+                          choices = (1:length(Phoenix$Grooves)) %>% set_names(Phoenix$id)
+        )
+      })
+      observeEvent(input$save, {
+        saveRDS(Phoenix$Grooves, file = saved_grooves_location_Phoenix)
+        message("groove data saved\n")
+      })
+      
+      observeEvent(input$plot_click, {
+        k <- as.numeric(input$k)
+        xloc <- input$plot_click$x
+        
+        gr <- Phoenix$Grooves[[k]]$groove
+        if (abs(gr[1] - xloc) < abs(gr[2] - xloc)) {
+          Phoenix$Grooves[[k]]$groove[1] <<- xloc
+        } else {
+          Phoenix$Grooves[[k]]$groove[2] <<- xloc
+        }
+        output$groovePlot <- renderPlot({
+          k <- as.numeric(input$k)
+          p <- Phoenix$Grooves[[k]]$plot +
+            geom_vline(xintercept = Phoenix$Grooves[[k]]$groove[1], colour = "green") +
+            geom_vline(xintercept = Phoenix$Grooves[[k]]$groove[2], colour = "green")
+          
+          p
+        })
+      })
+      output$info <- renderText({
+        paste0("x=", input$plot_click$x, "\ny=", input$plot_click$y)
+      })
+    },
+    options = list(height = 500)
+  )
+  saveRDS(Phoenix$Grooves, file = saved_grooves_location_Phoenix)
+} else {
+  if (!file.exists(saved_grooves_location_Phoenix)) {
+    message("run script in interactive mode to fix grooves")
+  } else {
+    Phoenix$Grooves <- readRDS(saved_grooves_location_Phoenix)
+  }
+}
+
+
+```
+
+```{r}
+
+
+Phoenix <- Phoenix %>% 
+ mutate(Signatures = future_map2(.x = CrossCut, .y = Grooves, .f = cc_get_signature, span = 0.75, span2 = .03))
+
+ Signatures_Phoenix <- Phoenix %>% 
+  select(id, Barrel, Bullet, Land, Signatures) %>% 
+   tidyr::unnest()
+
+Signatures_Phoenix %>%
+  filter(Barrel != "Unknown") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_grid(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels 1-10 173")
+
+Signatures_Phoenix %>%
+  filter(Barrel == "Unknown") %>%
+    ggplot(data = ., aes(x = x, y = sig, color = Land)) + 
+      geom_line()+
+        facet_wrap(paste("Bullet", Bullet) ~ sprintf("Barrel %02s", Barrel))+
+          ggtitle("Signatures Barrels Unknown")
+
+
+Phoenix <- Phoenix %>%
+  filter(!id %in% c("C8-B1-3", "U1-B3-5"))
+
+
+
+```
+
+```{r}
+
+Phoenix_Comparisons <- crossing(Bullet1 = Phoenix$id, Bullet2 = Phoenix$id) %>%
+  left_join(nest(Phoenix, -id) %>% magrittr::set_names(c("Bullet1", "Bullet1_data"))) %>%
+  left_join(nest(Phoenix, -id) %>% magrittr::set_names(c("Bullet2", "Bullet2_data")))
+
+
+```
+
+```{r}
+
+plan(multicore)
+
+get_sig <- function(data) {
+  map(data$Signatures, "sig")
+}
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  mutate(sig1 = future_map(Bullet1_data, get_sig), sig2 = future_map(Bullet2_data, get_sig))
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  mutate(Aligned = future_map2(sig1, sig2, ~sig_align(unlist(.x), unlist(.y)))) # Getting Aligned signatures
+# Get striae
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  mutate(Striae = future_map(Aligned, sig_cms_max)) # Obtaining Striae
+
+saveRDS(select(Phoenix_Comparisons, -Bullet1_data, -Bullet2_data), file = "Phoenix_Comp.rda")
+
+
+
+
+
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  select(-Bullet1_data, -Bullet2_data)
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(features = future_map2(.x = Aligned, .y = Striae, .f = extract_features_all, resolution = 1.5625))#ObtainingFeatures
+
+#comparisons_1 <- comparisons_1 %>% 
+  #mutate(Legacy_Features = future_map(Striae, extract_features_all_legacy, resolution = 1.5625)) # Obtaining feature leacy
+
+#comparisons_legacy_1 <- comparisons_1 %>% 
+  #select(-features) %>%
+  #tidyr::unnest(Legacy_Features) # Extracting feature legacy
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  tidyr::unnest(features)
+
+```
+
+```{r}
+
+
+head(Phoenix_Comparisons, 500)
+
+
+```
+
+```{r}
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  select(-sig1, -sig2, -Aligned, -Striae, - right_cms, -left_cms)
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>%
+  mutate(Bullet1 = gsub(" ", "", fixed = TRUE, Bullet1), Bullet2 = gsub(" ", "", fixed = TRUE, Bullet2))
+
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(BarrelA = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\1", Bullet2))
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(BarrelB = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\1", Bullet1))
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(BulletA = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet2))
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(BulletB = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\2", Bullet1))
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(LandA = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet2))
+Phoenix_Comparisons <- Phoenix_Comparisons %>% 
+  mutate(LandB = gsub("([A-Z][0-9]|Unknown)-(B[0-9]{1,2}|[0-9A-Z])-([1-6])", "\\3", Bullet1))
+
+```
+
+```{r}
+Phoenix_Comparisons %>% 
+  filter(BarrelA == "A9" & BarrelB == "A9") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+
+Phoenix_Comparisons %>% 
+  filter(BarrelA == "A9" & BarrelB == "F6") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = ccf)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = 0.5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+```
+
+```{r}
+Phoenix_Comparisons$rfscore <- predict(rtrees, newdata = Phoenix_Comparisons, type = "prob")[,2]
+
+```
+
+```{r}
+
+Phoenix_Comparisons %>%
+  filter(BarrelA == "A9" & BarrelB == "A9") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+Phoenix_Comparisons %>%
+  filter(BarrelA == "F6" & BarrelB == "Unknown") %>%
+  ggplot(aes(x = LandA, y = LandB, fill = rfscore)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BulletB~BulletA, labeller = "label_both") +
+  xlab("Land A") +
+  ylab("Land B") +
+  theme(aspect.ratio = 1)
+
+
+```
+
+```{r}
+
+
+Bullet_Scores_1 <- Phoenix_Comparisons %>% 
+  group_by(BulletA, BulletB) %>% 
+    tidyr::nest()
+
+Bullet_Scores_1 <- Bullet_Scores_1 %>% 
+  mutate(Bullet_Score = data %>% 
+          future_map_dbl(.f = function(d) max(compute_average_scores(land1 = d$LandA, land2 = d$LandB, d$rfscore))))
+
+Bullet_Scores_1 %>% 
+  select(-data) %>% 
+    arrange(desc(Bullet_Score))
+
+Bullet_Scores_1 <- Bullet_Scores_1 %>% 
+  mutate(data = data %>% 
+           future_map(.f = function(d){
+              d$samepath = bullet_to_land_predict(land1 = d$LandA, land2 = d$LandB, d$rfscore, difference = 0.1)
+  d
+}))
+
+ 
+
+Bullet_Scores_Examin_Phoenix <- Bullet_Scores_1 %>% 
+  tidyr::unnest(data)
+
+```
+
+```{r}
+ggplot(subset(Bullet_Scores_Examin_Phoenix, !BulletB %in% c("B1", "B2", "B3")))+
+      geom_tile(aes(x = BulletA, y = BulletB, fill = rfscore))+
+        scale_fill_gradient2(low = "grey80", high = "darkorange", 
+                       midpoint = .5) +
+  facet_grid(BarrelB~BarrelA, labeller = "label_both", scales = "free")
+
+```
